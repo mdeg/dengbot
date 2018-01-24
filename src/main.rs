@@ -12,18 +12,13 @@ use std::time::{SystemTime, UNIX_EPOCH, Duration};
 fn main() {
     let message = slack::api::MessageStandard { attachments: None, bot_id: None, channel: None,
         edited: None, event_ts: None, reply_broadcast: None, source_team: None,
-        user: Some(String::from("123")), text: Some(String::from("deng")), thread_ts: None, ts:
+        user: Some(String::from("999")), text: Some(String::from("deng")), thread_ts: None, ts:
         None,
     team: None, ty: None };
 
-    let dengs = match dengstorage::read_dengs() {
-        Ok(d) => d,
-        Err(_) => {
-            dengstorage::create_storage();
-            vec!()
-        }
-    };
+    let dengs = dengstorage::read_dengs().unwrap_or(dengstorage::create_storage());
 
+    // TODO: proper seed time
     let seed_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time has gone backwards");
@@ -32,7 +27,7 @@ fn main() {
 
     let current_day = ::std::ops::Range { start: seed_time, end: seed_time + Duration::from_secs(86400) };
 
-    let mut handler = denghandler::DengHandler { dengs, current_day };
+    let mut handler = denghandler::DengHandler::new(dengs, current_day);
     handler.handle_message(message);
 
 //    match slack::RtmClient::login_and_run(constants::TOKEN, &mut denghandler::DengHandler) {
@@ -40,4 +35,3 @@ fn main() {
 //        Err(e) => error!("Ungraceful termination due to error: {}", e)
 //    }
 }
-
