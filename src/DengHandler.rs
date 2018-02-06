@@ -70,13 +70,36 @@ impl DengHandler {
 
         debug!("Message from {}: {}", user, text);
 
-        let successful = regex::Regex::new(r"^deng$").expect("Bad deng regex").is_match(&text);
-        self.handle_deng(user, successful);
+        match regex::Regex::new(r"^deng$").expect("Bad deng regex").is_match(&text) {
+            true => self.handle_deng(user),
+            false => self.handle_non_deng(user)
+        }
 
         Ok(())
     }
 
-    fn handle_deng(&mut self, user_id: String, successful: bool) {
+    fn handle_non_deng(&mut self, user_id: String) {
+        debug!("Non-deng received from {}", user_id);
+
+        let time = ::std::time::SystemTime::now()
+            .duration_since(::std::time::UNIX_EPOCH)
+            .expect("Time has gone backwards");
+
+        let deng = Deng { ts: time.as_secs(), user_id, successful: false,
+            is_first_deng_of_day: false, is_users_first_deng_of_day: false };
+
+        self.store(deng);
+    }
+
+    fn store(&mut self, deng: Deng) {
+
+        self.dengs.push(deng);
+        dengstorage::store_deng(&self.dengs).expect("Could not store deng!");
+
+        debug!("{}", self.format_scoreboard());
+    }
+
+    fn handle_deng(&mut self, user_id: String) {
         debug!("Deng received from {}", user_id);
 
         let time = ::std::time::SystemTime::now()
@@ -86,13 +109,10 @@ impl DengHandler {
         let is_first_deng_of_day = self.is_first_deng_of_day();
         let is_users_first_deng_of_day = self.is_users_first_deng_of_day(&user_id);
 
-        let deng = Deng { ts: time.as_secs(), user_id, successful,
+        let deng = Deng { ts: time.as_secs(), user_id, successful: true,
             is_first_deng_of_day, is_users_first_deng_of_day };
 
-        self.dengs.push(deng);
-        dengstorage::store_deng(&self.dengs).expect("Could not store deng!");
-
-        println!("{}", self.format_scoreboard());
+        self.store(deng);
     }
 
     fn format_scoreboard(&self) -> String {

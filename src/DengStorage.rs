@@ -14,8 +14,7 @@ pub fn create_storage() -> Vec<Deng> {
 pub fn store_deng(deng: &Vec<Deng>) -> Result<(), serde_json::Error> {
 
     let f = ::std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
+        .append(true)
         .open(DENG_STORAGE)
         .expect(&format!("Could not open storage at {}", DENG_STORAGE));
 

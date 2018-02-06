@@ -1,6 +1,3 @@
-// TODO: pull from environment value
-pub static TOKEN: &'static str = "X";
-
 pub static DENG_STORAGE: &'static str = "./dengs";
 
 pub static DAILY_DENG_POINT_VALUE: i32 = 1;
