@@ -11,6 +11,7 @@ mod slackinfo;
 
 use simplelog::*;
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::fs::File;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -19,7 +20,12 @@ fn main() {
         x => args[x - 1].clone()
     };
 
-    TermLogger::init(LevelFilter::Debug, Config::default()).expect("Could not initialise logger");
+    CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Debug, Config::default()).expect("Could not initialise terminal logger"),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), File::create("dengbot.log").expect("Could not initialise write logger"))
+        ]
+    ).expect("Could not initialise combined logger");
 
     let dengs = dengstorage::read_dengs().unwrap_or_else(|_| dengstorage::create_storage());
 
