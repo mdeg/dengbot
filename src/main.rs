@@ -21,7 +21,7 @@ fn main() {
 
     TermLogger::init(LevelFilter::Debug, Config::default()).expect("Could not initialise logger");
 
-    let dengs = dengstorage::read_dengs().unwrap_or(dengstorage::create_storage());
+    let dengs = dengstorage::read_dengs().unwrap_or_else(|_| dengstorage::create_storage());
 
     // TODO: proper seed time
     let seed_time = SystemTime::now()

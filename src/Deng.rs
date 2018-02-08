@@ -39,14 +39,13 @@ impl Deng {
     }
 
     pub fn calculate_value(&self) -> i32 {
-        let points = DAILY_DENG_POINT_VALUE;
+        let mut points = DAILY_DENG_POINT_VALUE;
 
         if self.days_first_deng {
-            points + FIRST_DENG_POINT_VALUE;
+            points += FIRST_DENG_POINT_VALUE;
         }
-
         if self.users_first_deng {
-            points + USERS_FIRST_DENG_POINT_VALUE;
+            points += USERS_FIRST_DENG_POINT_VALUE;
         }
 
         points

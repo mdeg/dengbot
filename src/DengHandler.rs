@@ -22,7 +22,7 @@ impl EventHandler for DengHandler {
 
         if let Event::Message(result) = event {
             if let slack::Message::Standard(message) = *result {
-                if let Err(e) = self.handle_message(&cli, message) {
+                if let Err(e) = self.handle_message(cli, message) {
                     error!("Could not process message: {}", e);
                 }
             }
@@ -64,9 +64,10 @@ impl DengHandler {
 
         if let Some(channel_id) = message.channel {
             if channel_id == listen_channel_id {
-                match regex::Regex::new(r"^deng$").expect("Bad deng regex").is_match(&text) {
-                    true => self.handle_deng(user),
-                    false => self.handle_non_deng(user)
+                if &text == "deng" {
+                    self.handle_deng(user);
+                } else {
+                    self.handle_non_deng(user)
                 }
             }
         }
@@ -102,7 +103,7 @@ impl DengHandler {
     fn format_scoreboard(&self) -> String {
         let mut ordered_scores = (&self.dengs).iter()
             .filter(|deng| deng.successful)
-            .fold(HashMap::new(), |mut map, ref deng| {
+            .fold(HashMap::new(), |mut map, deng| {
                 *map.entry(&deng.user_id).or_insert(0) += deng.calculate_value();
                 map
             })
