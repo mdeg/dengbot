@@ -11,3 +11,6 @@ serde = "*"
 serde_derive = "*"
 serde_json = "*"
 simplelog = "*"
+
+[target.heroku]
+version = "nightly"
