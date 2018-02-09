@@ -46,7 +46,7 @@ fn main() {
         loop {
             let sleep_time = {
                 let mut current_day = time_handle.lock().unwrap();
-                current_day.start - current_day.end
+                current_day.end - current_day.start
             };
             std::thread::sleep(sleep_time);
             *time_handle.lock().unwrap() = calculate_new_day();
@@ -68,6 +68,7 @@ fn calculate_new_day() -> std::ops::Range<Duration> {
         .expect("Time has gone backwards");
     // TODO: add randomness?
     let day_period = std::ops::Range { start: day_start, end: day_start + Duration::from_secs(86400) };
-    debug!("Day reset: start {:?} end {:?}", day_period.start, day_period.end);
+    // TODO: convert these times into local timezone for readability
+    debug!("Today starts @ {:?}. Next day starts @ {:?}", day_period.start.as_secs(), day_period.end.as_secs());
     day_period
 }
