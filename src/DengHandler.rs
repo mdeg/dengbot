@@ -8,10 +8,11 @@ use dengstorage;
 use std::ops::Range;
 use std::collections::HashMap;
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 pub struct DengHandler {
     pub dengs: Vec<Deng>,
-    pub current_day: Range<::std::time::Duration>,
+    pub current_day: Arc<Mutex<Range<::std::time::Duration>>>,
     pub info: Option<SlackInfo>
 }
 
@@ -42,7 +43,7 @@ impl EventHandler for DengHandler {
 
 impl DengHandler {
 
-    pub fn new(dengs: Vec<Deng>, current_day: Range<::std::time::Duration>) -> Self {
+    pub fn new(dengs: Vec<Deng>, current_day: Arc<Mutex<Range<::std::time::Duration>>>) -> Self {
         DengHandler {
             dengs,
             current_day,
@@ -145,14 +146,14 @@ impl DengHandler {
     fn is_users_first_deng_of_day(&self, user_id: &str) -> bool {
         self.dengs.iter()
             .rev()
-            .take_while(|deng| Duration::from_secs(deng.ts) > self.current_day.start)
+            .take_while(|deng| Duration::from_secs(deng.ts) > self.current_day.lock().unwrap().start)
             .all(|deng| deng.user_id != user_id)
     }
 
     fn is_first_deng_of_day(&self) -> bool {
         self.dengs.iter()
             .rev()
-            .take_while(|deng| Duration::from_secs(deng.ts) > self.current_day.start)
+            .take_while(|deng| Duration::from_secs(deng.ts) > self.current_day.lock().unwrap().start)
             .count() == 0
     }
 }
