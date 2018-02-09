@@ -15,10 +15,17 @@ use std::fs::File;
 use std::sync::{Arc, Mutex};
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let api_key = match args.len() {
-        0 | 1 => panic!("No API key in arguments! Usage: dengbot <TOKEN>"),
-        x => args[x - 1].clone()
+
+    let api_key = match std::env::var(constants::TOKEN_ENV_VAR) {
+        Ok(token) => token,
+        Err(_) => {
+            println!("Could not find environment variable {}. Falling back to arguments", constants::TOKEN_ENV_VAR);
+            let args: Vec<String> = std::env::args().collect();
+            match args.len() {
+                0 | 1 => panic!("No API key in arguments! Usage: dengbot <TOKEN>"),
+                x => args[x - 1].clone()
+            }
+        }
     };
 
     let log_file = File::create("dengbot.log").expect("Could not initialise write logger");
@@ -35,13 +42,13 @@ fn main() {
     let current_day = Arc::new(Mutex::new(calculate_new_day()));
     // Set up a thread to reset the day
     let time_handle = current_day.clone();
-    ::std::thread::spawn(move || {
+    std::thread::spawn(move || {
         loop {
             let sleep_time = {
                 let mut current_day = time_handle.lock().unwrap();
                 current_day.start - current_day.end
             };
-            ::std::thread::sleep(sleep_time);
+            std::thread::sleep(sleep_time);
             *time_handle.lock().unwrap() = calculate_new_day();
         }
     });
@@ -55,12 +62,12 @@ fn main() {
     }
 }
 
-fn calculate_new_day() -> ::std::ops::Range<Duration> {
+fn calculate_new_day() -> std::ops::Range<Duration> {
     let day_start = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time has gone backwards");
     // TODO: add randomness?
-    let day_period = ::std::ops::Range { start: day_start, end: day_start + Duration::from_secs(86400) };
+    let day_period = std::ops::Range { start: day_start, end: day_start + Duration::from_secs(86400) };
     debug!("Day reset: start {:?} end {:?}", day_period.start, day_period.end);
     day_period
 }
