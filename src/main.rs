@@ -28,7 +28,7 @@ fn main() {
         }
     };
 
-    let log_file = File::create("dengbot.log").expect("Could not initialise write logger");
+    let log_file = File::create("/tmp/dengbot.log").expect("Could not initialise write logger");
     CombinedLogger::init(
         vec![
             TermLogger::new(LevelFilter::Debug, Config::default()).expect("Could not initialise terminal logger"),

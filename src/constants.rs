@@ -1,4 +1,4 @@
-pub static DENG_STORAGE: &'static str = "./dengs";
+pub static DENG_STORAGE: &'static str = "/tmp/dengs";
 pub static TOKEN_ENV_VAR: &'static str = "DENGBOT_TOKEN";
 
 pub static DAILY_DENG_POINT_VALUE: i32 = 1;
