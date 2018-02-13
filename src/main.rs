@@ -28,15 +28,20 @@ fn main() {
         }
     };
 
-    let log_file = File::create("/tmp/dengbot.log").expect("Could not initialise write logger");
-    CombinedLogger::init(
-        vec![
-            TermLogger::new(LevelFilter::Debug, Config::default()).expect("Could not initialise terminal logger"),
-            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
-        ]
-    ).expect("Could not initialise combined logger");
-
-    let dengs = dengstorage::read_dengs().unwrap_or_else(|_| dengstorage::create_storage());
+    // TODO: clean this up
+    let environment = std::env::var(constants::RUN_MODE_ENV_VAR).unwrap_or("local".to_string());
+    let dengs = match environment.as_ref() {
+        "server" => {
+            init_server_logging();
+            debug!("Starting in server environment");
+            dengstorage::read_dengs_server().unwrap_or_else(|_| dengstorage::create_storage())
+        },
+        _ => {
+            init_local_logging();
+            debug!("Starting in local enviroment");
+            dengstorage::read_dengs_local().unwrap_or_else(|_| dengstorage::create_storage())
+        }
+    };
 
     // Start the day immediately
     let current_day = Arc::new(Mutex::new(calculate_new_day()));
@@ -60,6 +65,21 @@ fn main() {
         Ok(_) => debug!("Gracefully closed connection"),
         Err(e) => error!("Ungraceful termination due to error: {}", e)
     }
+}
+
+fn init_server_logging() {
+    let log_file = File::create("/tmp/dengbot.log").expect("Could not create log file");
+    WriteLogger::init(LevelFilter::Trace, Config::default(), log_file).expect("Could not initialise write logger");
+}
+
+fn init_local_logging() {
+    let log_file = File::create("./dengbot.log").expect("Could not create log file");
+    CombinedLogger::init(
+        vec![
+            TermLogger::new(LevelFilter::Debug, Config::default()).expect("Could not initialise terminal logger"),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
+        ]
+    ).expect("Could not initialise combined logger");
 }
 
 fn calculate_new_day() -> std::ops::Range<Duration> {
