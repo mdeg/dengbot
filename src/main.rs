@@ -43,6 +43,8 @@ fn main() {
         }
     };
 
+    debug!("Heroku port is {}", std::env::var("PORT").unwrap_or("DUNNO".to_string()));
+
     // Start the day immediately
     let current_day = Arc::new(Mutex::new(calculate_new_day()));
     // Set up a thread to reset the day
@@ -69,7 +71,12 @@ fn main() {
 
 fn init_server_logging() {
     let log_file = File::create("/tmp/dengbot.log").expect("Could not create log file");
-    WriteLogger::init(LevelFilter::Trace, Config::default(), log_file).expect("Could not initialise write logger");
+    CombinedLogger::init(
+        vec![
+            SimpleLogger::new(LevelFilter::Debug, Config::default()),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
+        ]
+    ).expect("Could not initialise combined logger");
 }
 
 fn init_local_logging() {
