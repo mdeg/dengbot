@@ -32,18 +32,14 @@ fn main() {
     let environment = std::env::var(constants::RUN_MODE_ENV_VAR).unwrap_or("local".to_string());
     let dengs = match environment.as_ref() {
         "server" => {
-            init_server_logging();
-            debug!("Starting in server environment");
+            init_server();
             dengstorage::read_dengs_server().unwrap_or_else(|_| dengstorage::create_storage())
         },
         _ => {
-            init_local_logging();
-            debug!("Starting in local enviroment");
+            init_local();
             dengstorage::read_dengs_local().unwrap_or_else(|_| dengstorage::create_storage())
         }
     };
-
-    debug!("Heroku port is {}", std::env::var("PORT").unwrap_or("DUNNO".to_string()));
 
     // Start the day immediately
     let current_day = Arc::new(Mutex::new(calculate_new_day()));
@@ -69,7 +65,7 @@ fn main() {
     }
 }
 
-fn init_server_logging() {
+fn init_server() {
     let log_file = File::create("/tmp/dengbot.log").expect("Could not create log file");
     CombinedLogger::init(
         vec![
@@ -77,9 +73,15 @@ fn init_server_logging() {
             WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
         ]
     ).expect("Could not initialise combined logger");
+
+    debug!("Starting in server environment");
+
+    if let Ok(port) = std::env::var(constants::HEROKU_PORT_ENV_VAR) {
+        debug!("Heroku has assigned port {}", port);
+    }
 }
 
-fn init_local_logging() {
+fn init_local() {
     let log_file = File::create("./dengbot.log").expect("Could not create log file");
     CombinedLogger::init(
         vec![
@@ -87,6 +89,8 @@ fn init_local_logging() {
             WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
         ]
     ).expect("Could not initialise combined logger");
+
+    debug!("Starting in local enviroment");
 }
 
 fn calculate_new_day() -> std::ops::Range<Duration> {
