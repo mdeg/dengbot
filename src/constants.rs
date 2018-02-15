@@ -1,4 +1,3 @@
-pub static LOCAL_DENG_STORAGE: &'static str = "./dengs";
 pub static TOKEN_ENV_VAR: &'static str = "DENGBOT_TOKEN";
 pub static RUN_MODE_ENV_VAR: &'static str = "DENGBOT_RUN_MODE";
 pub static HEROKU_PORT_ENV_VAR: &'static str = "PORT";

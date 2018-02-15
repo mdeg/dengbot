@@ -89,7 +89,7 @@ impl DengHandler {
 
     fn store(&mut self, deng: Deng) {
         self.dengs.push(deng);
-        dengstorage::store_deng(&self.dengs).expect("Could not store deng!");
+        dengstorage::store_deng("./dengs", &self.dengs).expect("Could not store deng!");
     }
 
     fn handle_deng(&mut self, user_id: String) {
