@@ -17,9 +17,13 @@ pub fn store_deng(path: &str, deng: &[Deng]) -> Result<(), serde_json::Error> {
 pub fn read(path: &str) -> Vec<Deng> {
     match File::open(path) {
         Ok(f) => serde_json::from_reader(BufReader::new(&f)).expect("Could not deserialize dengs"),
-        Err(_) => {
-            File::create(path).expect("Could not create deng storage file");
-            vec!()
-        }
+        Err(_) => create_file(path),
     }
+}
+
+fn create_file(path: &str) -> Vec<Deng> {
+    let f = File::create(path).expect("Could not create deng storage file!");
+    let dengs: Vec<Deng> = vec![];
+    serde_json::to_writer(f, &dengs);
+    dengs
 }

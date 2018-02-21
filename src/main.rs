@@ -1,77 +1,82 @@
-extern crate slack;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
 extern crate simplelog;
+extern crate slack;
 
-mod constants;
 mod denghandler;
 mod deng;
 mod dengstorage;
 mod slackinfo;
 mod environment;
+mod daycycle;
+mod runner;
+mod send;
 
 use environment::*;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
-use std::sync::{Arc, Mutex};
+use runner::*;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use std::thread;
+use slackinfo::SlackInfo;
+
+pub static TOKEN_ENV_VAR: &'static str = "DENGBOT_TOKEN";
+pub static RUN_MODE_ENV_VAR: &'static str = "DENGBOT_RUN_MODE";
+pub static HEROKU_PORT_ENV_VAR: &'static str = "PORT";
 
 fn main() {
-
-    let api_key = match std::env::var(constants::TOKEN_ENV_VAR) {
+    let api_key = match std::env::var(TOKEN_ENV_VAR) {
         Ok(token) => token,
         Err(_) => {
-            println!("Could not find environment variable {}. Falling back to arguments", constants::TOKEN_ENV_VAR);
+            println!("Could not find environment variable {}. Falling back to arguments", TOKEN_ENV_VAR);
             let args: Vec<String> = std::env::args().collect();
             match args.len() {
                 0 | 1 => panic!("No API key in arguments! Usage: dengbot <TOKEN>"),
-                x => args[x - 1].clone()
+                x => args[x - 1].clone(),
             }
         }
     };
 
     // Initialise for correct environment
-    let env = std::env::var(constants::RUN_MODE_ENV_VAR).unwrap_or("local".to_string());
+    let env = std::env::var(RUN_MODE_ENV_VAR).unwrap_or_else(|_| "local".to_string());
     let environ: Box<Init> = match env.as_ref() {
         "server" => Box::new(ServerEnvironment),
-        "local" | _ => Box::new(LocalEnvironment)
+        "local" | _ => Box::new(LocalEnvironment),
     };
     environ.init_logger();
     environ.announce();
+    // TODO: separate deng reads from storage initialisation
     let dengs = environ.init_storage();
 
-    // Start the day immediately
-    let current_day = Arc::new(Mutex::new(calculate_new_day()));
-    start_day_reset(current_day.clone());
+    let (tx, rx) = mpsc::channel();
 
-    let mut handler = denghandler::DengHandler::new(dengs, current_day);
+    let (info, sender_tx) = launch_client(tx.clone(), api_key);
 
+    let mut runner = Runner::new(dengs, rx, sender_tx, info);
+    runner.run();
+}
+
+fn launch_client(tx: Sender<HandleableMessages>, api_key: &str) -> (SlackInfo, ::slack::Sender) {
     debug!("Launching client");
 
-    match slack::RtmClient::login_and_run(&api_key, &mut handler) {
-        Ok(_) => debug!("Gracefully closed connection"),
-        Err(e) => error!("Ungraceful termination due to error: {}", e)
-    }
-}
+    let client = slack::RtmClient::login(&api_key)
 
-fn start_day_reset(current_day_handle: Arc<Mutex<std::ops::Range<Duration>>>) {
-    std::thread::spawn(move || {
-        loop {
-            let sleep_time = {
-                let mut current_day = current_day_handle.lock().unwrap();
-                current_day.end - current_day.start
-            };
-            std::thread::sleep(sleep_time);
-            *current_day_handle.lock().unwrap() = calculate_new_day();
+        match  {
+        Ok(client) => client,
+        Err(e) => panic!("Could not connect to Slack client: {}", e),
+    };
+
+    thread::spawn(move || {
+        let mut handler = denghandler::DengHandler::new(tx);
+        match client.run(&mut handler) {
+            Ok(_) => debug!("Gracefully closed connection"),
+            Err(e) => error!("Ungraceful termination due to error: {}", e),
         }
     });
-}
 
-fn calculate_new_day() -> std::ops::Range<Duration> {
-    let day_start = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time has gone backwards");
-    // TODO: add randomness?
-    let day_period = std::ops::Range { start: day_start, end: day_start + Duration::from_secs(86400) };
-    // TODO: convert these times into local timezone for readability
-    debug!("Today starts @ {:?}. Next day starts @ {:?}", day_period.start.as_secs(), day_period.end.as_secs());
-    day_period
+    let info = SlackInfo::new(client.start_response());
+    let sender_tx = client.sender().clone();
+
+    (info, sender_tx)
 }

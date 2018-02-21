@@ -16,15 +16,14 @@ pub struct LocalEnvironment;
 pub struct ServerEnvironment;
 
 impl Init for LocalEnvironment {
-
     fn init_logger(&self) {
-        let log_file = File::create(self.get_logfile_location()).expect("Could not create log file");
-        CombinedLogger::init(
-            vec![
-                SimpleLogger::new(LevelFilter::Debug, Config::default()),
-                WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
-            ]
-        ).expect("Could not initialise combined logger");
+        let log_file = File::create(self.get_logfile_location())
+            .expect("Could not create log file");
+
+        CombinedLogger::init(vec![
+            SimpleLogger::new(LevelFilter::Debug, Config::default()),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
+        ]).expect("Could not initialise combined logger");
     }
 
     fn init_storage(&self) -> Vec<Deng> {
@@ -45,15 +44,15 @@ impl Init for LocalEnvironment {
 }
 
 impl Init for ServerEnvironment {
-
     fn init_logger(&self) {
-        let log_file = File::create(self.get_logfile_location()).expect("Could not create log file");
-        CombinedLogger::init(
-            vec![
-                TermLogger::new(LevelFilter::Debug, Config::default()).expect("Could not initialise terminal logger"),
-                WriteLogger::new(LevelFilter::Trace, Config::default(), log_file)
-            ]
-        ).expect("Could not initialise combined logger");
+        let log_file = File::create(self.get_logfile_location())
+            .expect("Could not create log file");
+
+        CombinedLogger::init(vec![
+            TermLogger::new(LevelFilter::Debug, Config::default())
+                .expect("Could not initialise terminal logger"),
+            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
+        ]).expect("Could not initialise combined logger");
     }
 
     fn init_storage(&self) -> Vec<Deng> {
@@ -63,7 +62,7 @@ impl Init for ServerEnvironment {
     fn announce(&self) {
         debug!("Starting in server enviroment");
 
-        if let Ok(port) = ::std::env::var(::constants::HEROKU_PORT_ENV_VAR) {
+        if let Ok(port) = ::std::env::var(::HEROKU_PORT_ENV_VAR) {
             debug!("Heroku has assigned port {}", port);
         }
     }
