@@ -51,7 +51,7 @@ fn main() {
 
     let (tx, rx) = mpsc::channel();
 
-    let (info, sender_tx) = launch_client(tx.clone(), api_key);
+    let (info, sender_tx) = launch_client(tx.clone(), &api_key);
 
     let mut runner = Runner::new(dengs, rx, sender_tx, info);
     runner.run();
@@ -60,12 +60,13 @@ fn main() {
 fn launch_client(tx: Sender<HandleableMessages>, api_key: &str) -> (SlackInfo, ::slack::Sender) {
     debug!("Launching client");
 
-    let client = slack::RtmClient::login(&api_key)
-
-        match  {
+    let client = match slack::RtmClient::login(&api_key) {
         Ok(client) => client,
         Err(e) => panic!("Could not connect to Slack client: {}", e),
     };
+
+    let info = SlackInfo::new(client.start_response());
+    let sender_tx = client.sender().clone();
 
     thread::spawn(move || {
         let mut handler = denghandler::DengHandler::new(tx);
@@ -74,9 +75,6 @@ fn launch_client(tx: Sender<HandleableMessages>, api_key: &str) -> (SlackInfo, :
             Err(e) => error!("Ungraceful termination due to error: {}", e),
         }
     });
-
-    let info = SlackInfo::new(client.start_response());
-    let sender_tx = client.sender().clone();
 
     (info, sender_tx)
 }

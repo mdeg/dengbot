@@ -5,7 +5,6 @@ use slack::*;
 use std::sync::mpsc::Sender;
 
 pub struct DengHandler {
-    listen_channel_id: String,
     tx: Sender<::HandleableMessages>,
     info: Option<::SlackInfo>
 }
@@ -49,7 +48,7 @@ impl DengHandler {
         debug!("Message from {}: {}", user, text);
 
         if let Some(channel_id) = message.channel {
-            if channel_id == self.info.listen_channel_id {
+            if channel_id == self.info.as_ref().unwrap().listen_channel_id {
                 let msg = {
                     if &text == "deng" {
                         ::HandleableMessages::Deng(user)
