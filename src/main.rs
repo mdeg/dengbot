@@ -1,7 +1,5 @@
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
+#[macro_use] extern crate log;
+#[macro_use] extern crate serde_derive;
 extern crate simplelog;
 extern crate slack;
 
@@ -20,6 +18,8 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread;
 use slackinfo::SlackInfo;
+use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
+
 
 pub static TOKEN_ENV_VAR: &'static str = "DENGBOT_TOKEN";
 pub static RUN_MODE_ENV_VAR: &'static str = "DENGBOT_RUN_MODE";
@@ -46,15 +46,33 @@ fn main() {
     };
     environ.init_logger();
     environ.announce();
+    let listen_port = environ.get_command_listener_port();
     // TODO: separate deng reads from storage initialisation
     let dengs = environ.init_storage();
 
     let (tx, rx) = mpsc::channel();
 
+    launch_command_listener(tx.clone(), listen_port);
     let (info, sender_tx) = launch_client(tx.clone(), &api_key);
 
     let mut runner = Runner::new(dengs, rx, sender_tx, info);
     runner.run();
+}
+
+fn launch_command_listener(tx: Sender<HandleableMessages>, listen_port: String) {
+    thread::spawn(move || {
+        let addr = SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), listen_port.parse::<u16>().unwrap());
+        let listener = TcpListener::bind(addr).expect("Could not create command listener");
+        for stream in listener.incoming() {
+            match stream {
+                Ok(recv) => {
+                    debug!("Received command contents from Slack: {:?}", recv);
+                    tx.send(HandleableMessages::PrintScoreboard);
+                },
+                Err(e) => panic!("Command listener server has died: {}", e)
+            }
+        }
+    });
 }
 
 fn launch_client(tx: Sender<HandleableMessages>, api_key: &str) -> (SlackInfo, ::slack::Sender) {

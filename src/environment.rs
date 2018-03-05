@@ -10,6 +10,8 @@ pub trait Init {
 
     fn get_storage_location(&self) -> &'static str;
     fn get_logfile_location(&self) -> &'static str;
+
+    fn get_command_listener_port(&self) -> String;
 }
 
 pub struct LocalEnvironment;
@@ -40,6 +42,11 @@ impl Init for LocalEnvironment {
 
     fn get_logfile_location(&self) -> &'static str {
         "./dengbot.log"
+    }
+
+    fn get_command_listener_port(&self) -> String {
+        // TODO
+        String::from("60400")
     }
 }
 
@@ -73,5 +80,10 @@ impl Init for ServerEnvironment {
 
     fn get_logfile_location(&self) -> &'static str {
         "./dengbot.log"
+    }
+
+    fn get_command_listener_port(&self) -> String {
+        ::std::env::var(::HEROKU_PORT_ENV_VAR)
+            .expect("Could not find port for command listener binding")
     }
 }

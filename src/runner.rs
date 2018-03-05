@@ -51,16 +51,14 @@ impl Runner {
                     self.dengs.push(deng);
                     dengstorage::store_deng("./dengs", &self.dengs).expect("Could not store deng!");
                 }
-                HandleableMessages::PrintScoreboard => debug!("Scoreboard called"),
+                HandleableMessages::PrintScoreboard => {
+                    debug!("Scoreboard called");
+                    self.tx.send_message(
+                        &self.info.meta_channel_id,
+                        &::send::format_scoreboard(&self.dengs, &self.info.users)
+                    );
+                },
             };
-
-            println!("Recv completed");
-
-            // TODO
-            self.tx.send_message(
-                &self.info.meta_channel_id,
-                &::send::format_scoreboard(&self.dengs, &self.info.users),
-            );
         }
     }
 

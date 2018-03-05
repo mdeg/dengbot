@@ -13,8 +13,8 @@ pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String 
         .collect::<Vec<_>>();
 
     if ordered_scores.is_empty() {
-        info!("No scores found");
-        return String::new();
+        info!("No scoreboard info found - returning default.");
+        return String::from("No scores yet!");
     }
 
     ordered_scores.sort_by(|first, second| second.1.cmp(&first.1));
