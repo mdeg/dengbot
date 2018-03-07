@@ -52,12 +52,11 @@ impl Runner {
                     dengstorage::store_deng("./dengs", &self.dengs).expect("Could not store deng!");
                 }
                 HandleableMessages::PrintScoreboard => {
-                    debug!("Scoreboard called");
-                    self.tx.send_message(
-                        &self.info.meta_channel_id,
-                        &::send::format_scoreboard(&self.dengs, &self.info.users)
-                    );
-                },
+                    debug!("Sending scoreboard printout");
+                    if let Err(e) = ::send::send_raw_msg(&self.tx, &self.info.meta_channel_id) {
+                        error!("{}", e);
+                    }
+                }
             };
         }
     }

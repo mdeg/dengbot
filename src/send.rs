@@ -1,6 +1,28 @@
 use deng::Deng;
 use std::collections::HashMap;
 
+// TODO: move this into the forked slack crate
+pub fn send_raw_msg(sender: &::slack::Sender, channel_id: &str) -> Result<(), ::slack::Error> {
+
+    // TODO: serialize Slack stuff to json
+//    let attachment = ::slack::api::MessageStandardAttachment {
+//        text: Some(String::from("test text")),
+//        title: Some(String::from("test title")),
+//        ...
+//    };
+
+    let extra = format!(r#""attachments": [{{"text": "test attachment", "title": "Slack API Documentation"}}]"#);
+
+    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}", "text": "z", {}}}"#,
+            sender.get_msg_uid(),
+            channel_id,
+            extra);
+
+    debug!("Raw data to send: {}", data);
+
+    sender.send(&data)
+}
+
 pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String {
     let mut ordered_scores = dengs
         .iter()
