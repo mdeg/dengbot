@@ -4,12 +4,14 @@ use daycycle::*;
 use deng::Deng;
 use std::sync::{Arc, Mutex};
 use dengstorage;
+use diesel::PgConnection;
 
 pub struct Runner {
     dengs: Vec<Deng>,
-    rx: Receiver<HandleableMessages>,
+    day_cycle: Arc<Mutex<DayCycle>>,
     tx: ::slack::Sender,
     info: ::slackinfo::SlackInfo,
+    db_conn: PgConnection
 }
 
 // TODO: rename
@@ -20,44 +22,50 @@ pub enum HandleableMessages {
 }
 
 impl Runner {
-    pub fn new(dengs: Vec<Deng>, rx: Receiver<HandleableMessages>,
-               tx: ::slack::Sender, info: ::slackinfo::SlackInfo) -> Self {
-        Runner {
-            dengs,
-            rx,
-            tx,
-            info,
-        }
-    }
+    pub fn new(db_conn: PgConnection, tx: ::slack::Sender, info: ::slackinfo::SlackInfo) -> Self {
 
-    pub fn run(&mut self) {
+        let dengs = ::dengstorage::load(&db_conn);
+
         // Start the day immediately
         let day_cycle = Runner::start_day();
 
-        loop {
-            match self.rx.recv().expect("Receiver channel broken!") {
-                // TODO: clean this up
-                HandleableMessages::Deng(user_id) => {
-                    let day = day_cycle.lock().unwrap();
-                    let has_denged_today = day.has_denged_today(&user_id);
-                    let deng = Deng::new_success(user_id, day.first_deng(), has_denged_today);
+        Runner {
+            dengs,
+            day_cycle,
+            tx,
+            info,
+            db_conn
+        }
+    }
 
-                    self.dengs.push(deng);
-                    dengstorage::store_deng("./dengs", &self.dengs).expect("Could not store deng!");
-                }
-                HandleableMessages::NonDeng(user_id) => {
-                    let deng = Deng::new_fail(user_id);
+    pub fn run(&mut self, rx: &Receiver<HandleableMessages>) {
+        match rx.recv().expect("Receiver channel broken!") {
+            HandleableMessages::Deng(user_id) => self.handle_deng(user_id),
+            HandleableMessages::NonDeng(user_id) => self.handle_non_deng(user_id),
+            HandleableMessages::PrintScoreboard => self.handle_scoreboard()
+        };
+    }
 
-                    self.dengs.push(deng);
-                    dengstorage::store_deng("./dengs", &self.dengs).expect("Could not store deng!");
-                }
-                HandleableMessages::PrintScoreboard => {
-                    debug!("Sending scoreboard printout");
-                    if let Err(e) = ::send::send_raw_msg(&self.tx, &self.info.meta_channel_id) {
-                        error!("{}", e);
-                    }
-                }
-            };
+    fn handle_deng(&mut self, user_id: String) {
+        let (first_deng, has_denged_today) = {
+            let day = self.day_cycle.lock().unwrap();
+            (day.first_deng(), day.has_denged_today(&user_id))
+        };
+
+        let deng = dengstorage::store_success(&self.db_conn, user_id,
+                                              first_deng, has_denged_today);
+        self.dengs.push(deng);
+    }
+
+    fn handle_non_deng(&mut self, user_id: String) {
+        let deng = dengstorage::store_failure(&self.db_conn, user_id);
+        self.dengs.push(deng);
+    }
+
+    fn handle_scoreboard(&mut self) {
+        debug!("Sending scoreboard printout");
+        if let Err(e) = ::send::send_raw_msg(&self.tx, &self.info.meta_channel_id) {
+            error!("{}", e);
         }
     }
 

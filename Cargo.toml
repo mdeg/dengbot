@@ -11,6 +11,7 @@ serde = "*"
 serde_derive = "*"
 serde_json = "*"
 simplelog = "*"
+diesel = { version = "*", features = ["postgres"] }
 
 [target.heroku]
 version = "nightly"

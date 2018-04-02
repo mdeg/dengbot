@@ -1,5 +1,5 @@
 #[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate diesel;
 extern crate simplelog;
 extern crate slack;
 
@@ -19,6 +19,7 @@ use std::sync::mpsc::Sender;
 use std::thread;
 use slackinfo::SlackInfo;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
+use diesel::Connection;
 
 
 pub static TOKEN_ENV_VAR: &'static str = "DENGBOT_TOKEN";
@@ -47,16 +48,20 @@ fn main() {
     environ.init_logger();
     environ.announce();
     let listen_port = environ.get_command_listener_port();
-    // TODO: separate deng reads from storage initialisation
-    let dengs = environ.init_storage();
+    let db_url = environ.get_storage_location();
+
+    let db_conn = diesel::pg::PgConnection::establish(&db_url)
+        .expect(&format!("Error connecting to {}", db_url));
 
     let (tx, rx) = mpsc::channel();
 
     launch_command_listener(tx.clone(), listen_port);
     let (info, sender_tx) = launch_client(tx.clone(), &api_key);
 
-    let mut runner = Runner::new(dengs, rx, sender_tx, info);
-    runner.run();
+    let mut runner = Runner::new(db_conn, sender_tx, info);
+    loop {
+        runner.run(&rx);
+    }
 }
 
 fn launch_command_listener(tx: Sender<HandleableMessages>, listen_port: String) {

@@ -1,10 +1,8 @@
 use std::fs::File;
 use simplelog::*;
-use deng::Deng;
 
 pub trait Init {
     fn init_logger(&self);
-    fn init_storage(&self) -> Vec<Deng>;
 
     fn announce(&self);
 
@@ -17,6 +15,8 @@ pub trait Init {
 pub struct LocalEnvironment;
 pub struct ServerEnvironment;
 
+//TODO: implement this stuff using dotenv crate
+
 impl Init for LocalEnvironment {
     fn init_logger(&self) {
         let log_file = File::create(self.get_logfile_location())
@@ -28,16 +28,12 @@ impl Init for LocalEnvironment {
         ]).expect("Could not initialise combined logger");
     }
 
-    fn init_storage(&self) -> Vec<Deng> {
-        ::dengstorage::read(self.get_storage_location())
-    }
-
     fn announce(&self) {
         debug!("Starting in local enviroment");
     }
 
     fn get_storage_location(&self) -> &'static str {
-        "./dengs"
+        unimplemented!()
     }
 
     fn get_logfile_location(&self) -> &'static str {
@@ -62,10 +58,6 @@ impl Init for ServerEnvironment {
         ]).expect("Could not initialise combined logger");
     }
 
-    fn init_storage(&self) -> Vec<Deng> {
-        ::dengstorage::read(self.get_storage_location())
-    }
-
     fn announce(&self) {
         debug!("Starting in server enviroment");
 
@@ -75,7 +67,7 @@ impl Init for ServerEnvironment {
     }
 
     fn get_storage_location(&self) -> &'static str {
-        "./dengs"
+        unimplemented!()
     }
 
     fn get_logfile_location(&self) -> &'static str {
