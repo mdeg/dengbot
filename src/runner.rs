@@ -15,7 +15,7 @@ pub struct Runner {
 }
 
 // TODO: rename
-pub enum HandleableMessages {
+pub enum Broadcast {
     Deng(String),
     NonDeng(String),
     PrintScoreboard,
@@ -38,11 +38,11 @@ impl Runner {
         }
     }
 
-    pub fn run(&mut self, rx: &Receiver<HandleableMessages>) {
+    pub fn run(&mut self, rx: &Receiver<Broadcast>) {
         match rx.recv().expect("Receiver channel broken!") {
-            HandleableMessages::Deng(user_id) => self.handle_deng(user_id),
-            HandleableMessages::NonDeng(user_id) => self.handle_non_deng(user_id),
-            HandleableMessages::PrintScoreboard => self.handle_scoreboard()
+            Broadcast::Deng(user_id) => self.handle_deng(user_id),
+            Broadcast::NonDeng(user_id) => self.handle_non_deng(user_id),
+            Broadcast::PrintScoreboard => self.handle_scoreboard()
         };
     }
 
