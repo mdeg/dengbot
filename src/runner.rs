@@ -1,36 +1,25 @@
 use std::sync::mpsc::Receiver;
 use std::thread;
 use daycycle::*;
-use deng::Deng;
 use std::sync::{Arc, Mutex};
-use dengstorage;
+use storage;
 use diesel::PgConnection;
+use types::*;
 
 pub struct Runner {
-    dengs: Vec<Deng>,
     day_cycle: Arc<Mutex<DayCycle>>,
     tx: ::slack::Sender,
     info: ::slackinfo::SlackInfo,
     db_conn: PgConnection
 }
 
-// TODO: rename
-pub enum Broadcast {
-    Deng(String),
-    NonDeng(String),
-    PrintScoreboard,
-}
-
 impl Runner {
     pub fn new(db_conn: PgConnection, tx: ::slack::Sender, info: ::slackinfo::SlackInfo) -> Self {
-
-        let dengs = ::dengstorage::load(&db_conn);
 
         // Start the day immediately
         let day_cycle = Runner::start_day();
 
         Runner {
-            dengs,
             day_cycle,
             tx,
             info,
@@ -41,7 +30,10 @@ impl Runner {
     pub fn run(&mut self, rx: &Receiver<Broadcast>) {
         match rx.recv().expect("Receiver channel broken!") {
             Broadcast::Deng(user_id) => self.handle_deng(user_id),
-            Broadcast::NonDeng(user_id) => self.handle_non_deng(user_id),
+            Broadcast::NonDeng(user_id) => {
+                self.handle_non_deng(user_id);
+                self.handle_scoreboard();
+            },
             Broadcast::PrintScoreboard => self.handle_scoreboard()
         };
     }
@@ -52,18 +44,17 @@ impl Runner {
             (day.first_deng(), day.has_denged_today(&user_id))
         };
 
-        let deng = dengstorage::store_success(&self.db_conn, user_id,
-                                              first_deng, has_denged_today);
-        self.dengs.push(deng);
+        storage::store_success(&self.db_conn, user_id,
+                               first_deng, has_denged_today);
     }
 
     fn handle_non_deng(&mut self, user_id: String) {
-        let deng = dengstorage::store_failure(&self.db_conn, user_id);
-        self.dengs.push(deng);
+        storage::store_failure(&self.db_conn, user_id);
     }
 
     fn handle_scoreboard(&mut self) {
         debug!("Sending scoreboard printout");
+        let dengs = storage::load(&self.db_conn);
         if let Err(e) = ::send::send_raw_msg(&self.tx, &self.info.meta_channel_id) {
             error!("{}", e);
         }

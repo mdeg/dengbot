@@ -1,4 +1,4 @@
-use deng::Deng;
+use types::Deng;
 use diesel::{RunQueryDsl, PgConnection};
 use std::time::SystemTime;
 

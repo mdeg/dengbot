@@ -6,8 +6,8 @@ extern crate dotenv;
 #[macro_use] extern crate dotenv_codegen;
 
 mod denghandler;
-mod deng;
-mod dengstorage;
+mod storage;
+mod types;
 mod slackinfo;
 mod daycycle;
 mod runner;
@@ -15,6 +15,7 @@ mod send;
 
 use runner::*;
 use std::sync::mpsc;
+use types::Broadcast;
 use std::sync::mpsc::Sender;
 use std::thread;
 use slackinfo::SlackInfo;

@@ -1,4 +1,4 @@
-use deng::Deng;
+use types::Deng;
 use std::collections::HashMap;
 
 // TODO: move this into the forked slack crate
@@ -28,7 +28,8 @@ pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String 
         .iter()
         .filter(|deng| deng.successful)
         .fold(HashMap::new(), |mut map, deng| {
-            *map.entry(&deng.user_id).or_insert(0) += deng.calculate_value();
+            // TODO: calculate value
+            *map.entry(&deng.user_id).or_insert(0) += 1;
             map
         })
         .into_iter()
