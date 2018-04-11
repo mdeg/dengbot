@@ -40,6 +40,8 @@ fn main() {
     let db_conn = diesel::pg::PgConnection::establish(&db_url)
         .expect(&format!("Error connecting to {}", db_url));
 
+    debug!("Connected to database");
+
     let (tx, rx) = mpsc::channel();
 
     launch_command_listener(tx.clone(), listen_port);
@@ -54,11 +56,15 @@ fn main() {
 
 fn init_logger(path: &str) {
     let log_file = File::create(path).expect("Could not create log file");
-    CombinedLogger::init(vec![
-        TermLogger::new(LevelFilter::Debug, Config::default())
-            .expect("Could not initialise terminal logger"),
-        WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
-    ]).expect("Could not initialise combined logger");
+
+    if let Some(term_logger) = TermLogger::new(LevelFilter::Debug, Config::default()) {
+        CombinedLogger::init(vec![
+            term_logger,
+            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
+        ]).expect("Could not initialise combined logger");
+    } else {
+        WriteLogger::init(LevelFilter::Trace, Config::default(), log_file);
+    }
 }
 
 fn launch_command_listener(tx: Sender<Broadcast>, listen_port: &str) {

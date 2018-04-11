@@ -14,6 +14,3 @@ simplelog = "*"
 diesel = { version = "*", features = ["postgres"] }
 dotenv = "*"
 dotenv_codegen = "*"
-
-[target.heroku]
-version = "nightly"
