@@ -2,6 +2,8 @@
 #[macro_use] extern crate diesel;
 extern crate simplelog;
 extern crate slack;
+extern crate chrono;
+extern crate rand;
 extern crate dotenv;
 #[macro_use] extern crate dotenv_codegen;
 
@@ -24,6 +26,9 @@ use diesel::Connection;
 use dotenv::dotenv;
 use std::fs::File;
 use simplelog::*;
+
+const LISTEN_CHANNEL_NAME: &'static str = "dengs";
+const POST_CHANNEL_NAME: &'static str = "dengsmeta";
 
 fn main() {
 
@@ -63,7 +68,9 @@ fn init_logger(path: &str) {
             WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
         ]).expect("Could not initialise combined logger");
     } else {
-        WriteLogger::init(LevelFilter::Trace, Config::default(), log_file);
+        if let Err(e) = WriteLogger::init(LevelFilter::Trace, Config::default(), log_file) {
+            error!("Could not initialise write logger: {}", e);
+        }
     }
 }
 
@@ -75,7 +82,9 @@ fn launch_command_listener(tx: Sender<Broadcast>, listen_port: &str) {
             match stream {
                 Ok(recv) => {
                     debug!("Received command contents from Slack: {:?}", recv);
-                    tx.send(Broadcast::PrintScoreboard);
+                    if let Err(e) = tx.send(Broadcast::PrintScoreboard) {
+                        error!("Could not broadcast request to print scoreboard: {}", e);
+                    }
                 },
                 Err(e) => panic!("Command listener server has died: {}", e)
             }
@@ -84,21 +93,24 @@ fn launch_command_listener(tx: Sender<Broadcast>, listen_port: &str) {
 }
 
 fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (SlackInfo, ::slack::Sender) {
-    debug!("Launching client");
+    debug!("Launching Slack client");
 
     let client = match slack::RtmClient::login(&api_key) {
         Ok(client) => client,
         Err(e) => panic!("Could not connect to Slack client: {}", e),
     };
 
-    let info = SlackInfo::new(client.start_response());
+    let info = SlackInfo::from_start_response(client.start_response());
     let sender_tx = client.sender().clone();
 
     thread::spawn(move || {
         let mut handler = denghandler::DengHandler::new(tx);
-        match client.run(&mut handler) {
-            Ok(_) => debug!("Gracefully closed connection"),
-            Err(e) => error!("Ungraceful termination due to error: {}", e),
+        loop {
+            debug!("Connecting to Slack server");
+            match client.run(&mut handler) {
+                Ok(_) => debug!("Gracefully closed connection"),
+                Err(e) => error!("Ungraceful termination due to error: {}", e),
+            }
         }
     });
 

@@ -15,12 +15,8 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(db_conn: PgConnection, tx: ::slack::Sender, info: ::slackinfo::SlackInfo) -> Self {
-
-        // Start the day immediately
-        let day_cycle = Runner::start_day();
-
         Runner {
-            day_cycle,
+            day_cycle: Runner::start_day_cycle(),
             tx,
             info,
             db_conn
@@ -32,9 +28,9 @@ impl Runner {
             Broadcast::Deng(user_id) => self.handle_deng(user_id),
             Broadcast::NonDeng(user_id) => {
                 self.handle_non_deng(user_id);
-                self.handle_scoreboard();
+                self.handle_request_display_scoreboard();
             },
-            Broadcast::PrintScoreboard => self.handle_scoreboard()
+            Broadcast::PrintScoreboard => self.handle_request_display_scoreboard()
         };
     }
 
@@ -44,38 +40,38 @@ impl Runner {
             (day.first_deng(), day.has_denged_today(&user_id))
         };
 
-        storage::store_success(&self.db_conn, user_id,
-                               first_deng, has_denged_today);
+        storage::store_success(&self.db_conn, user_id, first_deng, has_denged_today);
     }
 
     fn handle_non_deng(&mut self, user_id: String) {
         storage::store_failure(&self.db_conn, user_id);
     }
 
-    fn handle_scoreboard(&mut self) {
+    fn handle_request_display_scoreboard(&mut self) {
         debug!("Sending scoreboard printout");
         let dengs = storage::load(&self.db_conn);
-        if let Err(e) = ::send::send_raw_msg(&self.tx, &self.info.meta_channel_id) {
-            error!("{}", e);
+        if let Err(e) = ::send::send_scoreboard(&self.tx, &self.info, &dengs) {
+            error!("Could not send scoreboard: {}", e);
         }
     }
 
-    // TODO: rewrite this
-    fn start_day() -> Arc<Mutex<DayCycle>> {
-        let day = Arc::new(Mutex::new(DayCycle::start()));
+    fn start_day_cycle() -> Arc<Mutex<DayCycle>> {
+        let day = Arc::new(Mutex::new(DayCycle::new()));
+        let day_obj_handle = day.clone();
 
-        let handle = day.clone();
-        thread::spawn(move || loop {
-            let sleep_time = {
-                handle.lock()
-                    .expect("Could not modify day cycle")
-                    .time_to_end()
-            };
-            thread::sleep(sleep_time);
-            *handle.lock().unwrap() = DayCycle::start();
+        thread::spawn(move || {
+            debug!("Launched time reset thread");
+            loop {
+                let sleep_time = {
+                    let day = &mut *day_obj_handle.lock().expect("Could not modify day cycle");
+                    // Generate a new day
+                    day.new_day();
+                    debug!("Starting new day: {:?}", day);
+                    day.time_to_end()
+                };
+                thread::sleep(sleep_time);
+            }
         });
-
-        debug!("Launched time reset thread");
 
         day
     }

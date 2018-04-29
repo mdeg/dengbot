@@ -4,16 +4,16 @@ pub struct SlackInfo {
     pub meta_channel_id: String,
 }
 
-// TODO: get rid of this!
+// Holds necessary server information received on initial connect
 impl SlackInfo {
-    pub fn new(resp: &::slack::api::rtm::StartResponse) -> Self {
+    pub fn from_start_response(resp: &::slack::api::rtm::StartResponse) -> Self {
         let mut channels = resp.channels
             .as_ref()
             .expect("No channel list returned")
             .iter();
 
         let listen_channel_id = channels
-            .find(|channel| channel.name.as_ref().expect("No listen channel name found") == "dengs")
+            .find(|channel| channel.name.as_ref().expect("No listen channel name found") == ::LISTEN_CHANNEL_NAME)
             .expect("Could not find listen channel by that name")
             .id
             .clone()
@@ -23,7 +23,7 @@ impl SlackInfo {
 
         let meta_channel_id = channels
             .find(|channel| {
-                channel.name.as_ref().expect("No listen channel name found") == "dengsmeta"
+                channel.name.as_ref().expect("No listen channel name found") == ::POST_CHANNEL_NAME
             })
             .expect("Could not find meta channel by that name")
             .id

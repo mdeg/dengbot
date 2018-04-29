@@ -29,7 +29,7 @@ impl EventHandler for DengHandler {
     fn on_connect(&mut self, cli: &RtmClient) {
         debug!("Connected to server");
 
-        self.info = Some(::SlackInfo::new(cli.start_response()));
+        self.info = Some(::SlackInfo::from_start_response(cli.start_response()));
     }
 }
 

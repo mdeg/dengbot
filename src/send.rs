@@ -1,8 +1,7 @@
 use types::Deng;
 use std::collections::HashMap;
 
-// TODO: move this into the forked slack crate
-pub fn send_raw_msg(sender: &::slack::Sender, channel_id: &str) -> Result<(), ::slack::Error> {
+pub fn send_raw_msg(sender: &::slack::Sender, msg: &str, channel_id: &str) -> Result<(), ::slack::Error> {
 
     // TODO: serialize Slack stuff to json
 //    let attachment = ::slack::api::MessageStandardAttachment {
@@ -13,7 +12,7 @@ pub fn send_raw_msg(sender: &::slack::Sender, channel_id: &str) -> Result<(), ::
 
     let extra = format!(r#""attachments": [{{"text": "test attachment", "title": "Slack API Documentation"}}]"#);
 
-    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}", "text": "z", {}}}"#,
+    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}send", "text": "z", {}}}"#,
             sender.get_msg_uid(),
             channel_id,
             extra);
@@ -23,13 +22,19 @@ pub fn send_raw_msg(sender: &::slack::Sender, channel_id: &str) -> Result<(), ::
     sender.send(&data)
 }
 
+pub fn send_scoreboard(sender: &::slack::Sender,
+                       info: &::slackinfo::SlackInfo,
+                       dengs: &[Deng]) -> Result<(), ::slack::Error> {
+    let raw = format_scoreboard(dengs, &info.users);
+    send_raw_msg(sender, &raw, &info.meta_channel_id)
+}
+
 pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String {
     let mut ordered_scores = dengs
         .iter()
         .filter(|deng| deng.successful)
         .fold(HashMap::new(), |mut map, deng| {
-            // TODO: calculate value
-            *map.entry(&deng.user_id).or_insert(0) += 1;
+            *map.entry(&deng.user_id).or_insert(0) += deng.value();
             map
         })
         .into_iter()
