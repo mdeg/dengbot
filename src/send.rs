@@ -10,9 +10,12 @@ pub fn send_raw_msg(sender: &::slack::Sender, msg: &str, channel_id: &str) -> Re
 //        ...
 //    };
 
-    let extra = format!(r#""attachments": [{{"text": "test attachment", "title": "Slack API Documentation"}}]"#);
+    let extra = format!(r#""attachments": [{{"text": "test attachment", "title": "Slack API Documentation",
+    "mrkdwn_in": ["text"]}}]"#);
 
-    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}send", "text": "z", {}}}"#,
+    println!("extra: {}", extra);
+
+    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}", "text": "z", {}}}"#,
             sender.get_msg_uid(),
             channel_id,
             extra);

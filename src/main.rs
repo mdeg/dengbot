@@ -75,8 +75,10 @@ fn init_logger(path: &str) {
 }
 
 fn launch_command_listener(tx: Sender<Broadcast>, listen_port: &str) {
-    let addr = SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), listen_port.parse::<u16>().unwrap());
+    // TODO: better URL parsing - get URL from system
+    let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 72), listen_port.parse::<u16>().unwrap());
     thread::spawn(move || {
+        debug!("Starting command listener server on {}", addr);
         let listener = TcpListener::bind(addr).expect("Could not create command listener");
         for stream in listener.incoming() {
             match stream {
@@ -105,12 +107,10 @@ fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (SlackInfo, ::slack::S
 
     thread::spawn(move || {
         let mut handler = denghandler::DengHandler::new(tx);
-        loop {
-            debug!("Connecting to Slack server");
-            match client.run(&mut handler) {
-                Ok(_) => debug!("Gracefully closed connection"),
-                Err(e) => error!("Ungraceful termination due to error: {}", e),
-            }
+        debug!("Connecting to Slack server");
+        match client.run(&mut handler) {
+            Ok(_) => debug!("Gracefully closed connection"),
+            Err(e) => error!("Ungraceful termination due to error: {}", e)
         }
     });
 

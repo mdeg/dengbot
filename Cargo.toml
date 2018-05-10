@@ -4,15 +4,15 @@ version = "0.1.0"
 authors = ["Michael Degano <michael@dega.no>"]
 
 [dependencies]
-slack = "*"
-log = "*"
-regex = "*"
-chrono = "*"
-rand = "*"
-serde = "*"
-serde_derive = "*"
-serde_json = "*"
-simplelog = "*"
-diesel = { version = "*", features = ["postgres"] }
-dotenv = "*"
-dotenv_codegen = "*"
+slack = "0.20.0"
+log = "0.4.1"
+regex = "0.2.11"
+chrono = "0.4.2"
+rand = "0.4.2"
+serde = "1.0.52"
+serde_derive = "1.0.52"
+serde_json = "1.0.17"
+simplelog = "0.5.1"
+diesel = { version = "1.2.2", features = ["postgres"] }
+dotenv = "0.11.0"
+dotenv_codegen = "0.11.0"
