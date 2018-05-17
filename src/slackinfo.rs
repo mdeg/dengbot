@@ -13,7 +13,7 @@ impl SlackInfo {
             .iter();
 
         let listen_channel_id = channels
-            .find(|channel| channel.name.as_ref().expect("No listen channel name found") == ::LISTEN_CHANNEL_NAME)
+            .find(|channel| channel.name.as_ref().expect("No listen channel name found") == dotenv!("LISTEN_CHANNEL_NAME"))
             .expect("Could not find listen channel by that name")
             .id
             .clone()
@@ -23,7 +23,7 @@ impl SlackInfo {
 
         let meta_channel_id = channels
             .find(|channel| {
-                channel.name.as_ref().expect("No listen channel name found") == ::POST_CHANNEL_NAME
+                channel.name.as_ref().expect("No listen channel name found") == dotenv!("META_CHANNEL_NAME")
             })
             .expect("Could not find meta channel by that name")
             .id

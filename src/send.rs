@@ -1,38 +1,43 @@
 use types::Deng;
 use std::collections::HashMap;
+use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
-pub fn send_raw_msg(sender: &::slack::Sender, msg: &str, channel_id: &str) -> Result<(), ::slack::Error> {
-
-    // TODO: serialize Slack stuff to json
-//    let attachment = ::slack::api::MessageStandardAttachment {
-//        text: Some(String::from("test text")),
-//        title: Some(String::from("test title")),
-//        ...
-//    };
-
-    let extra = format!(r#""attachments": [{{"text": "test attachment", "title": "Slack API Documentation",
-    "mrkdwn_in": ["text"]}}]"#);
-
-    println!("extra: {}", extra);
-
-    let data = format!(r#"{{"id": {},"type": "message", "channel": "{}", "text": "z", {}}}"#,
-            sender.get_msg_uid(),
-            channel_id,
-            extra);
-
-    debug!("Raw data to send: {}", data);
-
-    sender.send(&data)
-}
-
-pub fn send_scoreboard(sender: &::slack::Sender,
+pub fn send_scoreboard(hook_client: &::slack_hook::Slack,
                        info: &::slackinfo::SlackInfo,
-                       dengs: &[Deng]) -> Result<(), ::slack::Error> {
-    let raw = format_scoreboard(dengs, &info.users);
-    send_raw_msg(sender, &raw, &info.meta_channel_id)
+                       dengs: &[Deng]) -> Result<(), ::slack_hook::Error> {
+
+    let msg = match dengs.len() {
+        0 => {
+            info!("No scoreboard info found - returning default.");
+
+            PayloadBuilder::new()
+                .text("No scores yet!")
+                .build()
+                .unwrap()
+        },
+        _ => {
+            match format_scoreboard(dengs, &info.users) {
+                Ok(msg) => {
+                    PayloadBuilder::new()
+                        .text("DENG CHAMPS")
+                        .attachments(msg)
+                        .build()
+                        .unwrap()
+                },
+                Err(error) => {
+                    error!("Could not send scoreboard: {}", error);
+                    // TODO: cascade errors correctly
+                    return Ok(())
+                }
+            }
+        }
+    };
+
+    hook_client.send(&msg)
 }
 
-pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String {
+pub fn format_scoreboard(dengs: &[Deng],
+                         user_list: &[::slack::User]) -> Result<Vec<Attachment>, &'static str> {
     let mut ordered_scores = dengs
         .iter()
         .filter(|deng| deng.successful)
@@ -43,34 +48,38 @@ pub fn format_scoreboard(dengs: &[Deng], user_list: &[::slack::User]) -> String 
         .into_iter()
         .collect::<Vec<_>>();
 
-    if ordered_scores.is_empty() {
-        info!("No scoreboard info found - returning default.");
-        return String::from("No scores yet!");
-    }
-
     ordered_scores.sort_by(|first, second| second.1.cmp(&first.1));
 
     trace!("Raw ordered score list: {:?}", ordered_scores);
 
-    ordered_scores
-        .into_iter()
+    ordered_scores.into_iter()
         .map(|(user_id, score)| {
-            let default = String::from("Unknown");
-
-            let name = &user_list
+            let user = &user_list
                 .iter()
                 .find(|user| match user.id {
                     Some(ref id) => id == user_id,
                     None => false,
                 })
-                .map(|user| user.name.as_ref().unwrap_or(&default))
-                .unwrap();
+                .ok_or("Could not find matching user! Bot may need to reconnect to regenerate user list")?;
 
-            format!("{}\t\t{}", name, score)
+            let profile = user.profile
+                .as_ref()
+                .ok_or("Could not find user profile")?;
+
+            let name = profile.real_name
+                .as_ref()
+                .ok_or("Could not find username")?;
+
+            let avatar = profile.image_72
+                .as_ref()
+                .ok_or("Could not find avatar")?;
+
+            let formatted = format!("*{}*\t\t\t{}", name, score);
+
+            Ok(AttachmentBuilder::new(formatted)
+                .image_url(avatar.as_str())
+                .build()
+                .unwrap())
         })
-        .scan(String::new(), |state, line| {
-            Some(format!("{}\n{}", *state, &line))
-        })
-        .next()
-        .expect("Could not format the scoreboard")
+        .collect()
 }

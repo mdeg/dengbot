@@ -6,6 +6,9 @@ extern crate chrono;
 extern crate rand;
 extern crate dotenv;
 #[macro_use] extern crate dotenv_codegen;
+extern crate futures;
+extern crate hyper;
+extern crate slack_hook;
 
 mod denghandler;
 mod storage;
@@ -20,15 +23,14 @@ use std::sync::mpsc;
 use types::Broadcast;
 use std::sync::mpsc::Sender;
 use std::thread;
+use std::sync::Arc;
 use slackinfo::SlackInfo;
-use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
 use diesel::Connection;
+use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::fs::File;
 use simplelog::*;
-
-const LISTEN_CHANNEL_NAME: &'static str = "dengs";
-const POST_CHANNEL_NAME: &'static str = "dengsmeta";
+use futures::future::Future;
 
 fn main() {
 
@@ -42,18 +44,18 @@ fn main() {
 
     debug!("Starting up dengbot");
 
-    let db_conn = diesel::pg::PgConnection::establish(&db_url)
-        .expect(&format!("Error connecting to {}", db_url));
+    let db_conn = PgConnection::establish(&db_url)
+            .expect(&format!("Error connecting to {}", db_url));
 
     debug!("Connected to database");
 
     let (tx, rx) = mpsc::channel();
 
-    launch_command_listener(tx.clone(), listen_port);
-
     let (info, sender_tx) = launch_client(tx.clone(), &api_key);
 
-    let mut runner = Runner::new(db_conn, sender_tx, info);
+    launch_command_listener(info.clone(), listen_port);
+
+    let mut runner = Runner::new(db_conn, sender_tx);
     loop {
         runner.run(&rx);
     }
@@ -74,27 +76,63 @@ fn init_logger(path: &str) {
     }
 }
 
-fn launch_command_listener(tx: Sender<Broadcast>, listen_port: &str) {
-    // TODO: better URL parsing - get URL from system
-    let addr = SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 72), listen_port.parse::<u16>().unwrap());
-    thread::spawn(move || {
-        debug!("Starting command listener server on {}", addr);
-        let listener = TcpListener::bind(addr).expect("Could not create command listener");
-        for stream in listener.incoming() {
-            match stream {
-                Ok(recv) => {
-                    debug!("Received command contents from Slack: {:?}", recv);
-                    if let Err(e) = tx.send(Broadcast::PrintScoreboard) {
-                        error!("Could not broadcast request to print scoreboard: {}", e);
-                    }
-                },
-                Err(e) => panic!("Command listener server has died: {}", e)
-            }
+struct CommandListener {
+    info: Arc<SlackInfo>,
+    db_conn: PgConnection,
+    hook_client: slack_hook::Slack
+}
+
+impl CommandListener {
+    fn new(info: Arc<SlackInfo>) -> Self {
+        let db_url = dotenv!("DB_URL");
+        // TODO: use a connection pool for this
+        let db_conn = PgConnection::establish(&db_url)
+            .expect(&format!("Error connecting to {}", db_url));
+
+        Self {
+            info,
+            db_conn,
+            hook_client: slack_hook::Slack::new(dotenv!("WEBHOOK_URL")).unwrap()
         }
+    }
+
+    pub fn handle_scoreboard(&self) {
+        debug!("Sending scoreboard printout");
+        let dengs = storage::load(&self.db_conn);
+        if let Err(e) = ::send::send_scoreboard(&self.hook_client, &self.info, &dengs) {
+            error!("Could not send scoreboard: {}", e);
+        }
+    }
+}
+
+impl hyper::server::Service for CommandListener {
+    type Request = hyper::Request;
+    type Response = hyper::Response;
+    type Error = hyper::Error;
+    type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
+
+    fn call(&self, req: Self::Request) -> Self::Future {
+        self.handle_scoreboard();
+
+        Box::new(futures::future::ok(
+            hyper::Response::new().with_status(hyper::StatusCode::Ok)
+        ))
+    }
+}
+
+fn launch_command_listener(info: Arc<SlackInfo>, listen_port: &str) {
+    // TODO: better URL parsing - get URL from system
+    let addr = format!("192.168.1.72:{}", listen_port).parse().unwrap();
+    thread::spawn(move || {
+        let server = hyper::server::Http::new()
+            .bind(&addr, move || Ok(CommandListener::new(info.clone())))
+            .unwrap();
+
+        server.run().unwrap();
     });
 }
 
-fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (SlackInfo, ::slack::Sender) {
+fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (Arc<SlackInfo>, ::slack::Sender) {
     debug!("Launching Slack client");
 
     let client = match slack::RtmClient::login(&api_key) {
@@ -102,7 +140,7 @@ fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (SlackInfo, ::slack::S
         Err(e) => panic!("Could not connect to Slack client: {}", e),
     };
 
-    let info = SlackInfo::from_start_response(client.start_response());
+    let info = Arc::new(SlackInfo::from_start_response(client.start_response()));
     let sender_tx = client.sender().clone();
 
     thread::spawn(move || {

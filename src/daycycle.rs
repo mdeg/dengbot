@@ -46,11 +46,15 @@ impl DayCycle {
     }
 
     pub fn has_denged_today(&self, user_id: &str) -> bool {
-        self.denged_today.iter().any(|id| id.as_str() == user_id)
+        !self.denged_today.iter().any(|id| id.as_str() == user_id)
     }
 
     pub fn first_deng(&self) -> bool {
         self.denged_today.is_empty()
+    }
+
+    pub fn register_deng(&mut self, user_id: &str) {
+        self.denged_today.push(String::from(user_id));
     }
 }
 

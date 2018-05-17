@@ -1,7 +1,6 @@
 pub enum Broadcast {
     Deng(String),
-    NonDeng(String),
-    PrintScoreboard,
+    NonDeng(String)
 }
 
 #[derive(Debug, Queryable)]
@@ -17,9 +16,8 @@ pub struct Deng {
 impl Deng {
     pub fn value(&self) -> i32 {
         let mut value = 0;
-        if self.successful { value += 1 }
+        if self.successful && self.users_first_deng { value += 1 }
         if self.days_first_deng { value += 1 }
-        if self.users_first_deng { value += 1 }
         value
     }
 }
