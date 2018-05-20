@@ -19,7 +19,7 @@ pub fn send_scoreboard(hook_client: &::slack_hook::Slack,
             match format_scoreboard(dengs, &info.users) {
                 Ok(msg) => {
                     PayloadBuilder::new()
-                        .text("DENG CHAMPS")
+                        .text(":jewdave: *Deng Champions* :jewdave:")
                         .attachments(msg)
                         .build()
                         .unwrap()
@@ -66,18 +66,20 @@ pub fn format_scoreboard(dengs: &[Deng],
                 .as_ref()
                 .ok_or("Could not find user profile")?;
 
-            let name = profile.real_name
+            let username = profile.display_name
                 .as_ref()
                 .ok_or("Could not find username")?;
 
-            let avatar = profile.image_72
+            let full_name = profile.real_name
                 .as_ref()
-                .ok_or("Could not find avatar")?;
+                .ok_or("Could not find username")?;
 
-            let formatted = format!("*{}*\t\t\t{}", name, score);
+            let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
+
+            let formatted = format!("*{}* ({})\t\t\t*{}*", username, full_name, score);
 
             Ok(AttachmentBuilder::new(formatted)
-                .image_url(avatar.as_str())
+                .color(hex_color.as_str())
                 .build()
                 .unwrap())
         })

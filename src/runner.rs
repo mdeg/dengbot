@@ -8,16 +8,13 @@ use types::*;
 
 pub struct Runner {
     day_cycle: Arc<Mutex<DayCycle>>,
-    tx: ::slack::Sender,
     db_conn: PgConnection
 }
 
 impl Runner {
-    pub fn new(db_conn: PgConnection,
-               tx: ::slack::Sender) -> Self {
+    pub fn new(db_conn: PgConnection) -> Self {
         Runner {
             day_cycle: Runner::start_day_cycle(),
-            tx,
             db_conn
         }
     }

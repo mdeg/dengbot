@@ -51,11 +51,11 @@ fn main() {
 
     let (tx, rx) = mpsc::channel();
 
-    let (info, sender_tx) = launch_client(tx.clone(), &api_key);
+    let info = launch_client(tx.clone(), &api_key);
 
     launch_command_listener(info.clone(), listen_port);
 
-    let mut runner = Runner::new(db_conn, sender_tx);
+    let mut runner = Runner::new(db_conn);
     loop {
         runner.run(&rx);
     }
@@ -112,6 +112,9 @@ impl hyper::server::Service for CommandListener {
     type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
+
+        debug!("COMMAND REQUEST: {:#?}", req);
+
         self.handle_scoreboard();
 
         Box::new(futures::future::ok(
@@ -132,7 +135,7 @@ fn launch_command_listener(info: Arc<SlackInfo>, listen_port: &str) {
     });
 }
 
-fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (Arc<SlackInfo>, ::slack::Sender) {
+fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> Arc<SlackInfo> {
     debug!("Launching Slack client");
 
     let client = match slack::RtmClient::login(&api_key) {
@@ -141,7 +144,6 @@ fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (Arc<SlackInfo>, ::sla
     };
 
     let info = Arc::new(SlackInfo::from_start_response(client.start_response()));
-    let sender_tx = client.sender().clone();
 
     thread::spawn(move || {
         let mut handler = denghandler::DengHandler::new(tx);
@@ -152,5 +154,5 @@ fn launch_client(tx: Sender<Broadcast>, api_key: &str) -> (Arc<SlackInfo>, ::sla
         }
     });
 
-    (info, sender_tx)
+    info
 }
