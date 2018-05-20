@@ -76,9 +76,12 @@ pub fn format_scoreboard(dengs: &[Deng],
 
             let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
 
-            let formatted = format!("*{}* ({})\t\t\t*{}*", username, full_name, score);
+            let formatted_msg = match username.len() {
+                0 => format!("*{}*\t\t\t*{}*", full_name, score),
+                _ => format!("*{}* ({})\t\t\t*{}*", username, full_name, score)
+            };
 
-            Ok(AttachmentBuilder::new(formatted)
+            Ok(AttachmentBuilder::new(formatted_msg)
                 .color(hex_color.as_str())
                 .build()
                 .unwrap())
