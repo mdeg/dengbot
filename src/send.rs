@@ -1,10 +1,13 @@
 use types::Deng;
 use std::collections::HashMap;
+use slackinfo;
+use slack;
+use slack_hook;
 use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
-pub fn send_scoreboard(hook_client: &::slack_hook::Slack,
-                       info: &::slackinfo::SlackInfo,
-                       dengs: &[Deng]) -> Result<(), ::slack_hook::Error> {
+pub fn send_scoreboard(hook_client: &slack_hook::Slack,
+                       info: &slackinfo::SlackInfo,
+                       dengs: &[Deng]) -> Result<(), slack_hook::Error> {
 
     let msg = match dengs.len() {
         0 => {
@@ -37,7 +40,7 @@ pub fn send_scoreboard(hook_client: &::slack_hook::Slack,
 }
 
 pub fn format_scoreboard(dengs: &[Deng],
-                         user_list: &[::slack::User]) -> Result<Vec<Attachment>, &'static str> {
+                         user_list: &[slack::User]) -> Result<Vec<Attachment>, &'static str> {
     let mut ordered_scores = dengs
         .iter()
         .filter(|deng| deng.successful)

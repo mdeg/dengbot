@@ -1,12 +1,13 @@
 extern crate regex;
-extern crate slack;
 
+use slackinfo::SlackInfo;
+use slack;
 use slack::*;
 use std::sync::mpsc::Sender;
 
 pub struct DengHandler {
     tx: Sender<::Broadcast>,
-    info: Option<::SlackInfo>
+    info: Option<SlackInfo>
 }
 
 impl EventHandler for DengHandler {
@@ -29,7 +30,7 @@ impl EventHandler for DengHandler {
     fn on_connect(&mut self, cli: &RtmClient) {
         debug!("Connected to server");
 
-        self.info = Some(::SlackInfo::from_start_response(cli.start_response()));
+        self.info = Some(SlackInfo::from_start_response(cli.start_response()));
     }
 }
 

@@ -3,8 +3,16 @@ use std::thread;
 use daycycle::*;
 use std::sync::{Arc, Mutex};
 use storage;
-use diesel::PgConnection;
+use diesel::Connection;
+use diesel::pg::PgConnection;
 use types::*;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use slackinfo::SlackInfo;
+use denghandler;
+use slack;
+use hyper;
+use command;
 
 pub struct Runner {
     day_cycle: Arc<Mutex<DayCycle>>,
@@ -17,6 +25,55 @@ impl Runner {
             day_cycle: Runner::start_day_cycle(),
             db_conn
         }
+    }
+
+    pub fn start(&self, api_key: &str, listen_port: &str) -> Receiver<Broadcast> {
+        let (tx, rx) = mpsc::channel();
+        let info = self.launch_client(tx.clone(), api_key);
+        self.launch_command_listener(info.clone(), listen_port);
+        rx
+    }
+
+    fn launch_command_listener(&self, info: Arc<SlackInfo>, listen_port: &str) {
+        // TODO: better URL parsing - get URL from system
+        let addr = format!("192.168.1.72:{}", listen_port).parse().unwrap();
+
+        thread::spawn(move || {
+            let server = hyper::server::Http::new()
+                .bind(&addr, move || {
+                    // TODO: implement r2d2 and use a connection pool to avoid duplicating these connections
+                    let db_url = dotenv!("DB_URL");
+                    let db_conn = PgConnection::establish(&db_url)
+                        .expect(&format!("Error connecting to {}", db_url));
+                    
+                    Ok(command::CommandListener::new(info.clone(), db_conn))
+                })
+                .unwrap();
+
+            server.run().unwrap();
+        });
+    }
+
+    fn launch_client(&self, tx: Sender<Broadcast>, api_key: &str) -> Arc<SlackInfo> {
+        debug!("Launching Slack client");
+
+        let client = match slack::RtmClient::login(&api_key) {
+            Ok(client) => client,
+            Err(e) => panic!("Could not connect to Slack client: {}", e),
+        };
+
+        let info = Arc::new(SlackInfo::from_start_response(client.start_response()));
+
+        thread::spawn(move || {
+            let mut handler = denghandler::DengHandler::new(tx);
+            debug!("Connecting to Slack server");
+            match client.run(&mut handler) {
+                Ok(_) => debug!("Gracefully closed connection"),
+                Err(e) => error!("Ungraceful termination due to error: {}", e)
+            }
+        });
+
+        info
     }
 
     pub fn run(&mut self, rx: &Receiver<Broadcast>) {
