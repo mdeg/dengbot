@@ -50,16 +50,16 @@ fn main() {
 }
 
 fn init_logger(path: &str) {
-    let log_file = File::create(path).expect("Could not create log file");
-
-    if let Some(term_logger) = TermLogger::new(LevelFilter::Debug, Config::default()) {
-        CombinedLogger::init(vec![
-            term_logger,
-            WriteLogger::new(LevelFilter::Trace, Config::default(), log_file),
-        ]).expect("Could not initialise combined logger");
-    } else {
-        if let Err(e) = WriteLogger::init(LevelFilter::Trace, Config::default(), log_file) {
-            error!("Could not initialise write logger: {}", e);
-        }
+    let mut loggers: Vec<Box<SharedLogger>> = vec!();
+    match File::create(path) {
+        Ok(f) => loggers.push(WriteLogger::new(LevelFilter::Debug, Config::default(), f)),
+        Err(e) => error!("Could not create log file at {}: {}", path, e)
+    }
+    match TermLogger::new(LevelFilter::Debug, Config::default()) {
+        Some(logger) => loggers.push(logger),
+        None => error!("Could not create terminal logger")
+    }
+    if let Err(e) = CombinedLogger::init(loggers) {
+        error!("Could not initialise loggers: {}", e);
     }
 }
