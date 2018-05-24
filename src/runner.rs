@@ -3,7 +3,6 @@ use std::thread;
 use daycycle::*;
 use std::sync::{Arc, Mutex};
 use storage;
-use diesel::Connection;
 use diesel::pg::PgConnection;
 use types::*;
 use std::sync::mpsc;
@@ -13,17 +12,19 @@ use denghandler;
 use slack;
 use hyper;
 use command;
+use r2d2_diesel::ConnectionManager;
+use r2d2::Pool as ConnectionPool;
 
 pub struct Runner {
     day_cycle: Arc<Mutex<DayCycle>>,
-    db_conn: PgConnection
+    db_conn_pool: ConnectionPool<ConnectionManager<PgConnection>>
 }
 
 impl Runner {
-    pub fn new(db_conn: PgConnection) -> Self {
+    pub fn new(db_conn_pool: ConnectionPool<ConnectionManager<PgConnection>>) -> Self {
         Runner {
             day_cycle: Runner::start_day_cycle(),
-            db_conn
+            db_conn_pool
         }
     }
 
@@ -37,15 +38,12 @@ impl Runner {
     fn launch_command_listener(&self, info: Arc<SlackInfo>, listen_port: &str) {
         // TODO: better URL parsing - get URL from system
         let addr = format!("192.168.1.72:{}", listen_port).parse().unwrap();
+        let pool = self.db_conn_pool.clone();
 
         thread::spawn(move || {
             let server = hyper::server::Http::new()
                 .bind(&addr, move || {
-                    // TODO: implement r2d2 and use a connection pool to avoid duplicating these connections
-                    let db_url = dotenv!("DB_URL");
-                    let db_conn = PgConnection::establish(&db_url)
-                        .expect(&format!("Error connecting to {}", db_url));
-                    
+                    let db_conn = pool.get().unwrap();
                     Ok(command::CommandListener::new(info.clone(), db_conn))
                 })
                 .unwrap();
@@ -77,10 +75,12 @@ impl Runner {
     }
 
     pub fn run(&mut self, rx: &Receiver<Broadcast>) {
-        match rx.recv().expect("Receiver channel broken!") {
-            Broadcast::Deng(user_id) => self.handle_deng(user_id),
-            Broadcast::NonDeng(user_id) => self.handle_non_deng(user_id)
-        };
+        loop {
+            match rx.recv().expect("Receiver channel broken!") {
+                Broadcast::Deng(user_id) => self.handle_deng(user_id),
+                Broadcast::NonDeng(user_id) => self.handle_non_deng(user_id)
+            };
+        }
     }
 
     fn handle_deng(&mut self, user_id: String) {
@@ -91,11 +91,11 @@ impl Runner {
             (first_deng, denged_today)
         };
 
-        storage::store_success(&self.db_conn, user_id, first_deng, has_denged_today);
+        storage::store_success(&self.db_conn_pool.get().unwrap(), user_id, first_deng, has_denged_today);
     }
 
     fn handle_non_deng(&mut self, user_id: String) {
-        storage::store_failure(&self.db_conn, user_id);
+        storage::store_failure(&self.db_conn_pool.get().unwrap(), user_id);
     }
 
     fn start_day_cycle() -> Arc<Mutex<DayCycle>> {

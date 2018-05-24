@@ -1,3 +1,5 @@
+pub type DbConnection = ::r2d2::PooledConnection<::r2d2_diesel::ConnectionManager<::diesel::PgConnection>>;
+
 pub enum Broadcast {
     Deng(String),
     NonDeng(String)

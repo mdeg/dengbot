@@ -1,20 +1,20 @@
 use futures::future::Future;
 use futures;
-use diesel::PgConnection;
 use std::sync::Arc;
 use storage;
 use slack_hook;
 use hyper;
 use slackinfo::SlackInfo;
+use types::DbConnection;
 
 pub struct CommandListener {
     info: Arc<SlackInfo>,
-    db_conn: PgConnection,
+    db_conn: DbConnection,
     hook_client: slack_hook::Slack
 }
 
 impl CommandListener {
-    pub fn new(info: Arc<SlackInfo>, db_conn: PgConnection) -> Self {
+    pub fn new(info: Arc<SlackInfo>, db_conn: DbConnection) -> Self {
         Self {
             info,
             db_conn,

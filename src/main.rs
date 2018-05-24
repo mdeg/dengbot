@@ -9,6 +9,8 @@ extern crate dotenv;
 extern crate futures;
 extern crate hyper;
 extern crate slack_hook;
+extern crate r2d2;
+extern crate r2d2_diesel;
 
 mod denghandler;
 mod storage;
@@ -21,8 +23,6 @@ mod command;
 
 use runner::*;
 use types::Broadcast;
-use diesel::Connection;
-use diesel::pg::PgConnection;
 use dotenv::dotenv;
 use std::fs::File;
 use simplelog::*;
@@ -39,12 +39,12 @@ fn main() {
 
     debug!("Starting up dengbot");
 
-    let db_conn = PgConnection::establish(&db_url)
-            .expect(&format!("Error connecting to {}", db_url));
+    let conn_mgr = r2d2_diesel::ConnectionManager::new(db_url);
+    let db_conn_pool = r2d2::Pool::builder().build(conn_mgr).unwrap();
 
     debug!("Connected to database");
 
-    let mut runner = Runner::new(db_conn);
+    let mut runner = Runner::new(db_conn_pool.clone());
     let rx = runner.start(&api_key, &listen_port);
     runner.run(&rx);
 }
