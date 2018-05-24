@@ -11,6 +11,7 @@ extern crate hyper;
 extern crate slack_hook;
 extern crate r2d2;
 extern crate r2d2_diesel;
+extern crate local_ip;
 
 mod denghandler;
 mod storage;
@@ -37,15 +38,18 @@ fn main() {
 
     init_logger(&log_path);
 
-    debug!("Starting up dengbot");
+    info!("Starting up dengbot");
 
+    // kickstart the connection pool
     let conn_mgr = r2d2_diesel::ConnectionManager::new(db_url);
     let db_conn_pool = r2d2::Pool::builder().build(conn_mgr).unwrap();
 
-    debug!("Connected to database");
+    info!("Connected to database");
 
     let mut runner = Runner::new(db_conn_pool.clone());
     let rx = runner.start(&api_key, &listen_port);
+
+    // TODO: handle crashes
     runner.run(&rx);
 }
 
@@ -53,13 +57,13 @@ fn init_logger(path: &str) {
     let mut loggers: Vec<Box<SharedLogger>> = vec!();
     match File::create(path) {
         Ok(f) => loggers.push(WriteLogger::new(LevelFilter::Debug, Config::default(), f)),
-        Err(e) => error!("Could not create log file at {}: {}", path, e)
+        Err(e) => warn!("Could not create log file at {}: {}", path, e)
     }
     match TermLogger::new(LevelFilter::Debug, Config::default()) {
         Some(logger) => loggers.push(logger),
-        None => error!("Could not create terminal logger")
+        None => warn!("Could not create terminal logger")
     }
     if let Err(e) = CombinedLogger::init(loggers) {
-        error!("Could not initialise loggers: {}", e);
+        warn!("Could not initialise loggers: {}", e);
     }
 }

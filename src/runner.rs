@@ -36,9 +36,10 @@ impl Runner {
     }
 
     fn launch_command_listener(&self, info: Arc<SlackInfo>, listen_port: &str) {
-        // TODO: better URL parsing - get URL from system
-        let addr = format!("192.168.1.72:{}", listen_port).parse().unwrap();
+        let addr = format!("{}:{}", ::local_ip::get().unwrap(), listen_port).parse().unwrap();
         let pool = self.db_conn_pool.clone();
+
+        info!("Starting command listener on {}", &addr);
 
         thread::spawn(move || {
             let server = hyper::server::Http::new()
@@ -53,7 +54,7 @@ impl Runner {
     }
 
     fn launch_client(&self, tx: Sender<Broadcast>, api_key: &str) -> Arc<SlackInfo> {
-        debug!("Launching Slack client");
+        info!("Launching Slack client");
 
         let client = match slack::RtmClient::login(&api_key) {
             Ok(client) => client,
@@ -64,9 +65,9 @@ impl Runner {
 
         thread::spawn(move || {
             let mut handler = denghandler::DengHandler::new(tx);
-            debug!("Connecting to Slack server");
+            info!("Connecting to Slack server");
             match client.run(&mut handler) {
-                Ok(_) => debug!("Gracefully closed connection"),
+                Ok(_) => info!("Gracefully closed connection"),
                 Err(e) => error!("Ungraceful termination due to error: {}", e)
             }
         });
@@ -103,13 +104,13 @@ impl Runner {
         let day_obj_handle = day.clone();
 
         thread::spawn(move || {
-            debug!("Launched time reset thread");
+            info!("Launched time reset thread");
             loop {
                 let sleep_time = {
                     let day = &mut *day_obj_handle.lock().expect("Could not modify day cycle");
                     // Generate a new day
                     day.new_day();
-                    debug!("Starting new day: {:?}", day);
+                    info!("Starting new day: {:?}", day);
                     day.time_to_end()
                 };
                 thread::sleep(sleep_time);

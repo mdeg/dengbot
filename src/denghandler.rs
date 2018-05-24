@@ -12,7 +12,7 @@ pub struct DengHandler {
 
 impl EventHandler for DengHandler {
     fn on_event(&mut self, _cli: &RtmClient, event: Event) {
-        debug!("Event received: {:?}", event);
+        info!("Event received: {:?}", event);
 
         if let Event::Message(result) = event {
             if let Message::Standard(message) = *result {
@@ -24,12 +24,11 @@ impl EventHandler for DengHandler {
     }
 
     fn on_close(&mut self, _cli: &RtmClient) {
-        debug!("Connection closed")
+        info!("Connection closed")
     }
 
     fn on_connect(&mut self, cli: &RtmClient) {
-        debug!("Connected to server");
-
+        info!("Connected to server");
         self.info = Some(SlackInfo::from_start_response(cli.start_response()));
     }
 }

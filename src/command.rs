@@ -23,7 +23,8 @@ impl CommandListener {
     }
 
     pub fn handle_scoreboard(&self) {
-        debug!("Sending scoreboard printout");
+        info!("Sending scoreboard printout");
+
         let dengs = storage::load(&self.db_conn);
         if let Err(e) = ::send::send_scoreboard(&self.hook_client, &self.info, &dengs) {
             error!("Could not send scoreboard: {}", e);
@@ -39,7 +40,7 @@ impl hyper::server::Service for CommandListener {
 
     fn call(&self, req: Self::Request) -> Self::Future {
 
-        debug!("COMMAND REQUEST: {:#?}", req);
+        debug!("Contents of command request received from Slack: {:#?}", req);
 
         self.handle_scoreboard();
 
