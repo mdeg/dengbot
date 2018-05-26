@@ -28,15 +28,15 @@ impl Runner {
         }
     }
 
-    pub fn start(&self, api_key: &str, listen_port: &str) -> Receiver<Broadcast> {
+    pub fn start(&mut self, api_key: &str, listen_port: &str) {
         let (tx, rx) = mpsc::channel();
         let info = self.launch_client(tx.clone(), api_key);
         self.launch_command_listener(info.clone(), listen_port);
-        rx
+        self.run(rx);
     }
 
     fn launch_command_listener(&self, info: Arc<SlackInfo>, listen_port: &str) {
-        let addr = format!("{}:{}", ::local_ip::get().unwrap(), listen_port).parse().unwrap();
+        let addr = format!("0.0.0.0:{}", listen_port).parse().unwrap();
         let pool = self.db_conn_pool.clone();
 
         info!("Starting command listener on {}", &addr);
@@ -47,7 +47,7 @@ impl Runner {
                     let db_conn = pool.get().unwrap();
                     Ok(command::CommandListener::new(info.clone(), db_conn))
                 })
-                .unwrap();
+                .expect("Could not create hyper command listener server");
 
             server.run().unwrap();
         });
@@ -56,10 +56,7 @@ impl Runner {
     fn launch_client(&self, tx: Sender<Broadcast>, api_key: &str) -> Arc<SlackInfo> {
         info!("Launching Slack client");
 
-        let client = match slack::RtmClient::login(&api_key) {
-            Ok(client) => client,
-            Err(e) => panic!("Could not connect to Slack client: {}", e),
-        };
+        let client = slack::RtmClient::login(&api_key).expect("Could not connect to Slack!");
 
         let info = Arc::new(SlackInfo::from_start_response(client.start_response()));
 
@@ -75,7 +72,7 @@ impl Runner {
         info
     }
 
-    pub fn run(&mut self, rx: &Receiver<Broadcast>) {
+    fn run(&mut self, rx: Receiver<Broadcast>) {
         loop {
             match rx.recv().expect("Receiver channel broken!") {
                 Broadcast::Deng(user_id) => self.handle_deng(user_id),

@@ -19,20 +19,12 @@ pub fn send_scoreboard(hook_client: &slack_hook::Slack,
                 .unwrap()
         },
         _ => {
-            match format_scoreboard(dengs, &info.users) {
-                Ok(msg) => {
-                    PayloadBuilder::new()
-                        .text(":jewdave: *Deng Champions* :jewdave:")
-                        .attachments(msg)
-                        .build()
-                        .unwrap()
-                },
-                Err(error) => {
-                    error!("Could not send scoreboard: {}", error);
-                    // TODO: cascade errors correctly
-                    return Ok(())
-                }
-            }
+            let msg = format_scoreboard(dengs, &info.users)?;
+            PayloadBuilder::new()
+                .text(":jewdave: *Deng Champions* :jewdave:")
+                .attachments(msg)
+                .build()
+                .unwrap()
         }
     };
 
@@ -80,8 +72,8 @@ pub fn format_scoreboard(dengs: &[Deng],
             let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
 
             let formatted_msg = match username.len() {
-                0 => format!("*{}*\t\t\t*{}*", full_name, score),
-                _ => format!("*{}* ({})\t\t\t*{}*", username, full_name, score)
+                0 => format!("*{}*\t\t\t*{}*", score, full_name),
+                _ => format!("*{}*\t\t\t*{}* ({})", score, username, full_name)
             };
 
             Ok(AttachmentBuilder::new(formatted_msg)

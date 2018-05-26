@@ -11,7 +11,6 @@ extern crate hyper;
 extern crate slack_hook;
 extern crate r2d2;
 extern crate r2d2_diesel;
-extern crate local_ip;
 
 mod denghandler;
 mod storage;
@@ -23,7 +22,6 @@ mod send;
 mod command;
 
 use runner::*;
-use types::Broadcast;
 use dotenv::dotenv;
 use std::fs::File;
 use simplelog::*;
@@ -47,10 +45,9 @@ fn main() {
     info!("Connected to database");
 
     let mut runner = Runner::new(db_conn_pool.clone());
-    let rx = runner.start(&api_key, &listen_port);
-
-    // TODO: handle crashes
-    runner.run(&rx);
+    loop {
+        runner.start(&api_key, &listen_port);
+    }
 }
 
 fn init_logger(path: &str) {
