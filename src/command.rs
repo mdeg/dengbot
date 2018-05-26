@@ -1,6 +1,5 @@
 use futures::future::Future;
 use futures;
-use std::sync::Arc;
 use storage;
 use slack_hook;
 use hyper;
@@ -8,13 +7,13 @@ use slackinfo::SlackInfo;
 use types::DbConnection;
 
 pub struct CommandListener {
-    info: Arc<SlackInfo>,
+    info: SlackInfo,
     db_conn: DbConnection,
     hook_client: slack_hook::Slack
 }
 
 impl CommandListener {
-    pub fn new(info: Arc<SlackInfo>, db_conn: DbConnection) -> Self {
+    pub fn new(info: SlackInfo, db_conn: DbConnection) -> Self {
         Self {
             info,
             db_conn,

@@ -1,7 +1,6 @@
 use std::sync::mpsc::Receiver;
 use std::thread;
 use daycycle::*;
-use std::sync::Arc;
 use storage;
 use diesel::pg::PgConnection;
 use types::*;
@@ -30,16 +29,21 @@ impl Runner {
 
     pub fn start(&mut self, api_key: &str, listen_port: &str) {
         let (tx, rx) = mpsc::channel();
-        let info = self.launch_client(tx.clone(), api_key);
-        self.launch_command_listener(info.clone(), listen_port);
+        let (info_tx, info_rx) = mpsc::channel();
+
+        self.launch_client(tx.clone(), info_tx.clone(), api_key);
+        self.launch_command_listener(info_rx, listen_port);
         self.run(rx);
     }
 
-    fn launch_command_listener(&self, info: Arc<SlackInfo>, listen_port: &str) {
+    fn launch_command_listener(&self, info_rx: Receiver<SlackInfo>, listen_port: &str) {
         let addr = format!("0.0.0.0:{}", listen_port).parse().unwrap();
         let pool = self.db_conn_pool.clone();
 
         info!("Starting command listener on {}", &addr);
+
+        // Wait for the client thread to connect to the server and give us our info
+        let info = info_rx.recv().expect("Client died without sending us Slack info!");
 
         thread::spawn(move || {
             let server = hyper::server::Http::new()
@@ -53,23 +57,22 @@ impl Runner {
         });
     }
 
-    fn launch_client(&self, tx: Sender<Broadcast>, api_key: &str) -> Arc<SlackInfo> {
-        info!("Launching Slack client");
-
-        let client = slack::RtmClient::login(&api_key).expect("Could not connect to Slack!");
-
-        let info = Arc::new(SlackInfo::from_start_response(client.start_response()));
+    fn launch_client(&self, tx: Sender<Broadcast>, info_tx: Sender<SlackInfo>, api_key: &str) {
+        let key = String::from(api_key);
 
         thread::spawn(move || {
-            let mut handler = denghandler::DengHandler::new(tx);
             info!("Connecting to Slack server");
+
+            let client = slack::RtmClient::login(&key).expect("Could not connect to Slack!");
+            let mut handler = denghandler::DengHandler::new(tx, info_tx);
+
+            info!("Running Slack client");
+
             match client.run(&mut handler) {
                 Ok(_) => info!("Gracefully closed connection"),
                 Err(e) => error!("Ungraceful termination due to error: {}", e)
             }
         });
-
-        info
     }
 
     fn run(&mut self, rx: Receiver<Broadcast>) {

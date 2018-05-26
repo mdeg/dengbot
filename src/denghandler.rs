@@ -8,6 +8,7 @@ use std::sync::mpsc::Sender;
 
 pub struct DengHandler {
     tx: Sender<Broadcast>,
+    info_tx: Sender<SlackInfo>,
     info: Option<SlackInfo>
 }
 
@@ -30,13 +31,16 @@ impl EventHandler for DengHandler {
 
     fn on_connect(&mut self, cli: &RtmClient) {
         info!("Connected to server");
-        self.info = Some(SlackInfo::from_start_response(cli.start_response()));
+
+        let info = SlackInfo::from_start_response(cli.start_response());
+        self.info_tx.send(info.clone());
+        self.info = Some(info);
     }
 }
 
 impl DengHandler {
-    pub fn new(tx: Sender<Broadcast>) -> Self {
-        DengHandler { tx, info: None }
+    pub fn new(tx: Sender<Broadcast>, info_tx: Sender<SlackInfo>) -> Self {
+        DengHandler { tx, info_tx, info: None }
     }
 
     pub fn handle_message(&mut self, message: slack::api::MessageStandard) -> Result<(), String> {

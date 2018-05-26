@@ -1,3 +1,4 @@
+#[derive(Clone, Debug)]
 pub struct SlackInfo {
     pub users: Vec<::slack::User>,
     pub listen_channel_id: String,
