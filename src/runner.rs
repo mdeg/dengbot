@@ -1,7 +1,7 @@
 use std::sync::mpsc::Receiver;
 use std::thread;
 use daycycle::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use storage;
 use diesel::pg::PgConnection;
 use types::*;
@@ -16,14 +16,14 @@ use r2d2_diesel::ConnectionManager;
 use r2d2::Pool as ConnectionPool;
 
 pub struct Runner {
-    day_cycle: Arc<Mutex<DayCycle>>,
+    day_cycle: DayCycle,
     db_conn_pool: ConnectionPool<ConnectionManager<PgConnection>>
 }
 
 impl Runner {
     pub fn new(db_conn_pool: ConnectionPool<ConnectionManager<PgConnection>>) -> Self {
         Runner {
-            day_cycle: Runner::start_day_cycle(),
+            day_cycle: DayCycle::new(),
             db_conn_pool
         }
     }
@@ -82,38 +82,18 @@ impl Runner {
     }
 
     fn handle_deng(&mut self, user_id: String) {
-        let (first_deng, has_denged_today) = {
-            let mut day = self.day_cycle.lock().unwrap();
-            let (first_deng, denged_today) = (day.first_deng(), day.has_denged_today(&user_id));
-            day.register_deng(&user_id);
-            (first_deng, denged_today)
-        };
+        if self.day_cycle.has_ended() {
+            self.day_cycle.new_day();
+        }
 
-        storage::store_success(&self.db_conn_pool.get().unwrap(), user_id, first_deng, has_denged_today);
+        let first_deng = self.day_cycle.first_deng();
+        let denged_today = self.day_cycle.has_denged_today(&user_id);
+        self.day_cycle.register_deng(&user_id);
+
+        storage::store_success(&self.db_conn_pool.get().unwrap(), user_id, first_deng, denged_today);
     }
 
     fn handle_non_deng(&mut self, user_id: String) {
         storage::store_failure(&self.db_conn_pool.get().unwrap(), user_id);
-    }
-
-    fn start_day_cycle() -> Arc<Mutex<DayCycle>> {
-        let day = Arc::new(Mutex::new(DayCycle::new()));
-        let day_obj_handle = day.clone();
-
-        thread::spawn(move || {
-            info!("Launched time reset thread");
-            loop {
-                let sleep_time = {
-                    let day = &mut *day_obj_handle.lock().expect("Could not modify day cycle");
-                    // Generate a new day
-                    day.new_day();
-                    info!("Starting new day: {:?}", day);
-                    day.time_to_end()
-                };
-                thread::sleep(sleep_time);
-            }
-        });
-
-        day
     }
 }

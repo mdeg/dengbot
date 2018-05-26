@@ -13,36 +13,39 @@ pub struct DayCycle {
 impl DayCycle {
     pub fn new() -> Self {
         DayCycle {
-            day: Self::generate_day(),
+            day: Self::generate_day(Self::now()),
             denged_today: vec![],
         }
     }
 
     pub fn new_day(&mut self) {
-        self.day = Self::generate_day();
         self.denged_today.clear();
+
+        // Start a new day, but ensure the end is in the future
+        while self.has_ended() {
+            self.day = Self::generate_day(self.day.end);
+        }
     }
 
-    fn generate_day() -> Range<Duration> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time has gone backwards");
+    pub fn has_ended(&self) -> bool {
+        self.day.end < Self::now()
+    }
 
+    fn generate_day(start: Duration) -> Range<Duration> {
+        // In 24 hours time, with up to an hour variance either way
         let mut rng = thread_rng();
         let hours = 24.0 + rng.gen_range(-1.0, 1.0);
 
         Range {
-            start: now,
-            end: now + Duration::from_secs(hours as u64 * 60 * 60),
+            start,
+            end: start + Duration::from_secs(hours as u64 * 60 * 60),
         }
     }
 
-    pub fn time_to_end(&self) -> Duration {
-        let now = SystemTime::now()
+    fn now() -> Duration {
+        SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("Time has gone backwards");
-
-        self.day.end - now
+            .expect("Time has gone backwards")
     }
 
     pub fn has_denged_today(&self, user_id: &str) -> bool {
