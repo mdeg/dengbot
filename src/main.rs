@@ -40,7 +40,8 @@ fn main() {
 
     // kickstart the connection pool
     let conn_mgr = r2d2_diesel::ConnectionManager::new(db_url);
-    let db_conn_pool = r2d2::Pool::builder().build(conn_mgr).unwrap();
+    let db_conn_pool = r2d2::Pool::builder().build(conn_mgr)
+        .expect("Could not build DB connection pool");
 
     info!("Connected to database");
 
@@ -54,13 +55,16 @@ fn init_logger(path: &str) {
     let mut loggers: Vec<Box<SharedLogger>> = vec!();
     match File::create(path) {
         Ok(f) => loggers.push(WriteLogger::new(LevelFilter::Debug, Config::default(), f)),
-        Err(e) => warn!("Could not create log file at {}: {}", path, e)
+        Err(e) => println!("Could not create log file at {}: {}", path, e)
     }
     match TermLogger::new(LevelFilter::Debug, Config::default()) {
         Some(logger) => loggers.push(logger),
-        None => warn!("Could not create terminal logger")
+        None => {
+            println!("Could not create terminal logger: falling back to simple logger");
+            loggers.push(SimpleLogger::new(LevelFilter::Debug, Config::default()));
+        }
     }
     if let Err(e) = CombinedLogger::init(loggers) {
-        warn!("Could not initialise loggers: {}", e);
+        println!("Could not initialise loggers: {}", e);
     }
 }
