@@ -5,11 +5,11 @@ use storage;
 use diesel::pg::PgConnection;
 use types::*;
 use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use slackinfo::SlackInfo;
-use denghandler;
+use denghandler::DengHandler;
 use slack;
 use hyper;
+use std::time::Duration;
 use command;
 use r2d2_diesel::ConnectionManager;
 use r2d2::Pool as ConnectionPool;
@@ -31,13 +31,15 @@ impl Runner {
         let (tx, rx) = mpsc::channel();
         let (info_tx, info_rx) = mpsc::channel();
 
-        self.launch_client(tx.clone(), info_tx.clone(), api_key);
+        let handler = DengHandler::new(tx.clone(), info_tx.clone());
+        self.launch_client(handler, String::from(api_key));
+
         self.launch_command_listener(info_rx, listen_port);
         self.run(rx);
     }
 
     fn launch_command_listener(&self, info_rx: Receiver<SlackInfo>, listen_port: &str) {
-        let addr = format!("0.0.0.0:{}", listen_port).parse().unwrap();
+        let addr = format!("0.0.0.0:{}", listen_port).parse().expect("Listen port is not valid");
         let pool = self.db_conn_pool.clone();
 
         info!("Starting command listener on {}", &addr);
@@ -51,26 +53,31 @@ impl Runner {
                     let db_conn = pool.get().unwrap();
                     Ok(command::CommandListener::new(info.clone(), db_conn))
                 })
-                .expect("Could not create hyper command listener server");
+                .expect("Could not create command listener server");
 
             server.run().unwrap();
         });
     }
 
-    fn launch_client(&self, tx: Sender<Broadcast>, info_tx: Sender<SlackInfo>, api_key: &str) {
-        let key = String::from(api_key);
-
+    fn launch_client(&self, mut handler: DengHandler, key: String) {
         thread::spawn(move || {
-            info!("Connecting to Slack server");
+            loop {
+                info!("Connecting to Slack...");
 
-            let client = slack::RtmClient::login(&key).expect("Could not connect to Slack!");
-            let mut handler = denghandler::DengHandler::new(tx, info_tx);
+                match slack::RtmClient::login(&key) {
+                    Ok(client) => {
+                        info!("Login succeeded. Running Slack client...");
+                        match client.run(&mut handler) {
+                            Ok(_) => info!("Gracefully closed connection"),
+                            Err(e) => error!("Ungraceful termination due to error: {}", e)
+                        }
+                    },
+                    Err(e) => error!("Could not log in to Slack client: {}", e)
+                }
 
-            info!("Running Slack client");
-
-            match client.run(&mut handler) {
-                Ok(_) => info!("Gracefully closed connection"),
-                Err(e) => error!("Ungraceful termination due to error: {}", e)
+                // Sleep for 10 seconds before attempting to reconnect
+                warn!("Connection to Slack has been lost. Attempting reconnect in 10 seconds...");
+                thread::sleep(Duration::from_secs(10));
             }
         });
     }
