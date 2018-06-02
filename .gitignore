@@ -14,3 +14,4 @@ Cargo.lock
 *.iml
 *.log
 .env
+deploy.sh
