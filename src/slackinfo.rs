@@ -5,7 +5,9 @@ pub struct SlackInfo {
     pub meta_channel_id: String,
 }
 
-// Holds necessary server information received on initial connect
+// Slack will send us up-to-date channel and user IDs on initial connection
+// We need to store these and use them to store dengs and construct messages
+// It should be considered fatal if any of these data items are not found
 impl SlackInfo {
     pub fn from_start_response(resp: &::slack::api::rtm::StartResponse) -> Self {
         let mut channels = resp.channels
@@ -33,9 +35,9 @@ impl SlackInfo {
 
         debug!("Found meta channel ID: {}", meta_channel_id);
 
-        trace!("Unfiltered users list: {:?}", resp.users.as_ref().unwrap());
-
         let users = resp.users.clone().expect("No users returned on connection");
+
+        debug!("Users: {:#?}", users);
 
         SlackInfo {
             users,

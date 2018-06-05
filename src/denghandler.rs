@@ -33,8 +33,8 @@ impl EventHandler for DengHandler {
         info!("Connected to server");
 
         let info = SlackInfo::from_start_response(cli.start_response());
-        self.info_tx.send(info.clone());
-        self.info = Some(info);
+        self.info = Some(info.clone());
+        self.info_tx.send(info).unwrap_or(debug!("No receiver for on connect Slack info message"))
     }
 }
 
@@ -50,7 +50,11 @@ impl DengHandler {
         debug!("Message from {}: {}", user, text);
 
         if let Some(channel_id) = message.channel {
-        if channel_id == self.info.as_ref().unwrap().listen_channel_id {
+            let listen_channel_id = &self.info.as_ref()
+                .ok_or(String::from("Info has not been initialised yet"))?
+                .listen_channel_id;
+
+            if channel_id == *listen_channel_id {
                 let msg = match text.as_str() {
                     "deng" => Broadcast::Deng(user),
                     _ => Broadcast::NonDeng(user)

@@ -14,10 +14,13 @@ pub struct CommandListener {
 
 impl CommandListener {
     pub fn new(info: SlackInfo, db_conn: DbConnection) -> Self {
+        let client = slack_hook::Slack::new(dotenv!("WEBHOOK_URL"))
+            .expect("Could not build hook client!");
+
         Self {
             info,
             db_conn,
-            hook_client: slack_hook::Slack::new(dotenv!("WEBHOOK_URL")).unwrap()
+            hook_client: client
         }
     }
 
@@ -25,7 +28,7 @@ impl CommandListener {
         info!("Sending scoreboard printout");
 
         let dengs = storage::load(&self.db_conn);
-        if let Err(e) = ::send::send_scoreboard(&self.hook_client, &self.info, &dengs) {
+        if let Err(e) = ::send::build_scoreboard_message(&self.hook_client, &self.info, &dengs) {
             error!("Could not send scoreboard: {}", e);
         }
     }

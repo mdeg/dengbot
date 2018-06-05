@@ -5,9 +5,9 @@ use slack;
 use slack_hook;
 use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
-pub fn send_scoreboard(hook_client: &slack_hook::Slack,
-                       info: &slackinfo::SlackInfo,
-                       dengs: &[Deng]) -> Result<(), slack_hook::Error> {
+pub fn build_scoreboard_message(hook_client: &slack_hook::Slack,
+                                info: &slackinfo::SlackInfo,
+                                dengs: &[Deng]) -> Result<(), slack_hook::Error> {
 
     let msg = match dengs.len() {
         0 => {
@@ -15,24 +15,32 @@ pub fn send_scoreboard(hook_client: &slack_hook::Slack,
 
             PayloadBuilder::new()
                 .text("No scores yet!")
-                .build()
-                .unwrap()
+                .build()?
         },
         _ => {
-            let msg = format_scoreboard(dengs, &info.users)?;
+            let attachments = create_scoreboard_attachments(dengs, &info.users)
+                .into_iter()
+                .filter_map(|attachment| match attachment {
+                        Ok(attach) => Some(attach),
+                        Err(e) => {
+                            error!("Could not build attachment: {}", e);
+                            None
+                        }
+                })
+                .collect();
+
             PayloadBuilder::new()
                 .text(":jewdave: *Deng Champions* :jewdave:")
-                .attachments(msg)
-                .build()
-                .unwrap()
+                .attachments(attachments)
+                .build()?
         }
     };
 
     hook_client.send(&msg)
 }
 
-pub fn format_scoreboard(dengs: &[Deng],
-                         user_list: &[slack::User]) -> Result<Vec<Attachment>, &'static str> {
+fn create_scoreboard_attachments(dengs: &[Deng],
+                         user_list: &[slack::User]) -> Vec<Result<Attachment, String>> {
     let mut ordered_scores = dengs
         .iter()
         .filter(|deng| deng.successful)
@@ -76,10 +84,10 @@ pub fn format_scoreboard(dengs: &[Deng],
                 _ => format!("*{}*\t\t\t*{}* ({})", score, username, full_name)
             };
 
-            Ok(AttachmentBuilder::new(formatted_msg)
+            AttachmentBuilder::new(formatted_msg)
                 .color(hex_color.as_str())
                 .build()
-                .unwrap())
+                .map_err(|e| format!("Could not build attachment: {}", e))
         })
         .collect()
 }

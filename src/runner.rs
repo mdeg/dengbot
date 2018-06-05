@@ -50,12 +50,16 @@ impl Runner {
         thread::spawn(move || {
             let server = hyper::server::Http::new()
                 .bind(&addr, move || {
+                    // TODO: this should not unwrap
                     let db_conn = pool.get().unwrap();
                     Ok(command::CommandListener::new(info.clone(), db_conn))
                 })
                 .expect("Could not create command listener server");
 
-            server.run().unwrap();
+            match server.run() {
+                Ok(()) => info!("Command server ended gracefully"),
+                Err(e) => error!("Command server died: {}", e)
+            }
         });
     }
 
