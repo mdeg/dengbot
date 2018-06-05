@@ -1,5 +1,5 @@
 use types::Deng;
-use diesel::{RunQueryDsl, PgConnection};
+use diesel::{RunQueryDsl, PgConnection, QueryResult};
 use std::time::SystemTime;
 
 table! {
@@ -24,7 +24,6 @@ pub struct NewDeng {
 }
 
 impl NewDeng {
-
     pub fn new_success(user_id: String, days_first_deng: bool, users_first_deng: bool) -> Self {
         NewDeng {
             ts: SystemTime::now(),
@@ -46,27 +45,25 @@ impl NewDeng {
     }
 }
 
-pub fn store_failure(conn: &PgConnection, user_id: String) -> Deng {
-    let deng = NewDeng::new_failure(user_id);
+pub fn store_failure(conn: &PgConnection, user_id: String) -> QueryResult<Deng> {
 
+    let deng = NewDeng::new_failure(user_id);
     ::diesel::insert_into(dengs::table)
         .values(&deng)
         .get_result(conn)
-        .expect("Error saving deng")
 }
 
-pub fn store_success(conn: &PgConnection, user_id: String,
-                  days_first_deng: bool, users_first_deng: bool) -> Deng {
+pub fn store_success(conn: &PgConnection,
+                     user_id: String,
+                     days_first_deng: bool,
+                     users_first_deng: bool) -> QueryResult<Deng> {
 
     let deng = NewDeng::new_success(user_id, days_first_deng, users_first_deng);
-
     ::diesel::insert_into(dengs::table)
         .values(&deng)
         .get_result(conn)
-        .expect("Error saving deng")
 }
 
-pub fn load(conn: &PgConnection) -> Vec<Deng> {
+pub fn load(conn: &PgConnection) -> QueryResult<Vec<Deng>> {
     dengs::table.load::<Deng>(conn)
-        .expect("Could not load dengs from database")
 }

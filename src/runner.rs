@@ -104,10 +104,24 @@ impl Runner {
         let denged_today = self.day_cycle.has_denged_today(&user_id);
         self.day_cycle.register_deng(&user_id);
 
-        storage::store_success(&self.db_conn_pool.get().unwrap(), user_id, first_deng, denged_today);
+        match &self.db_conn_pool.get() {
+            Ok(conn) => {
+                if let Err(e) = storage::store_success(conn, user_id, first_deng, denged_today) {
+                    error!("Could not store successful deng: {}", e);
+                }
+            },
+            Err(e) => error!("Could not get connection to DB: {}", e)
+        }
     }
 
     fn handle_non_deng(&mut self, user_id: String) {
-        storage::store_failure(&self.db_conn_pool.get().unwrap(), user_id);
+        match &self.db_conn_pool.get() {
+            Ok(conn) => {
+                if let Err(e) = storage::store_failure(conn, user_id) {
+                    error!("Could not store failed deng: {}", e);
+                }
+            },
+            Err(e) => error!("Could not get connection to DB: {}", e)
+        }
     }
 }

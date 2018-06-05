@@ -34,7 +34,10 @@ impl EventHandler for DengHandler {
 
         let info = SlackInfo::from_start_response(cli.start_response());
         self.info = Some(info.clone());
-        self.info_tx.send(info).unwrap_or(debug!("No receiver for on connect Slack info message"))
+
+        if let Err(e) = self.info_tx.send(info) {
+            debug!("Could not broadcast on connect Slack info message: {}", e)
+        }
     }
 }
 
