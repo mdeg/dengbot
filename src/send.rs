@@ -5,17 +5,16 @@ use slack;
 use slack_hook;
 use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
-pub fn build_scoreboard_message(hook_client: &slack_hook::Slack,
-                                info: &slackinfo::SlackInfo,
-                                dengs: &[Deng]) -> Result<(), slack_hook::Error> {
+pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
+                                dengs: &[Deng]) -> Result<slack_hook::Payload, slack_hook::Error> {
 
-    let msg = match dengs.len() {
+    match dengs.len() {
         0 => {
             info!("No scoreboard info found - returning default.");
 
             PayloadBuilder::new()
                 .text("No scores yet!")
-                .build()?
+                .build()
         },
         _ => {
             let attachments = create_scoreboard_attachments(dengs, &info.users)
@@ -32,11 +31,9 @@ pub fn build_scoreboard_message(hook_client: &slack_hook::Slack,
             PayloadBuilder::new()
                 .text(":jewdave: *Deng Champions* :jewdave:")
                 .attachments(attachments)
-                .build()?
+                .build()
         }
-    };
-
-    hook_client.send(&msg)
+    }
 }
 
 fn create_scoreboard_attachments(dengs: &[Deng],
