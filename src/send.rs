@@ -1,4 +1,4 @@
-use types::Deng;
+use types::{Deng, Error};
 use std::collections::HashMap;
 use slackinfo;
 use slack;
@@ -6,7 +6,7 @@ use slack_hook;
 use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
 pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
-                                dengs: &[Deng]) -> Result<slack_hook::Payload, slack_hook::Error> {
+                                dengs: &[Deng]) -> Result<slack_hook::Payload, Error> {
 
     match dengs.len() {
         0 => {
@@ -15,6 +15,7 @@ pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
             PayloadBuilder::new()
                 .text("No scores yet!")
                 .build()
+                .map_err(|e| Error::from(e))
         },
         _ => {
             let attachments = create_scoreboard_attachments(dengs, &info.users)
@@ -32,12 +33,13 @@ pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
                 .text(":jewdave: *Deng Champions* :jewdave:")
                 .attachments(attachments)
                 .build()
+                .map_err(|e| Error::from(e))
         }
     }
 }
 
 fn create_scoreboard_attachments(dengs: &[Deng],
-                         user_list: &[slack::User]) -> Vec<Result<Attachment, String>> {
+                         user_list: &[slack::User]) -> Vec<Result<Attachment, Error>> {
     let mut ordered_scores = dengs
         .iter()
         .filter(|deng| deng.successful)
@@ -60,19 +62,19 @@ fn create_scoreboard_attachments(dengs: &[Deng],
                     Some(ref id) => id == user_id,
                     None => false,
                 })
-                .ok_or("Could not find matching user! Bot may need to reconnect to regenerate user list")?;
+                .ok_or(Error::from("Could not find matching user"))?;
 
             let profile = user.profile
                 .as_ref()
-                .ok_or("Could not find user profile")?;
+                .ok_or(Error::from("Could not find user profile"))?;
 
             let username = profile.display_name
                 .as_ref()
-                .ok_or("Could not find username")?;
+                .ok_or(Error::from("Could not find username"))?;
 
             let full_name = profile.real_name
                 .as_ref()
-                .ok_or("Could not find username")?;
+                .ok_or(Error::from("Could not find username"))?;
 
             let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
 
@@ -84,7 +86,7 @@ fn create_scoreboard_attachments(dengs: &[Deng],
             AttachmentBuilder::new(formatted_msg)
                 .color(hex_color.as_str())
                 .build()
-                .map_err(|e| format!("Could not build attachment: {}", e))
+                .map_err(|e| Error::from(e))
         })
         .collect()
 }
