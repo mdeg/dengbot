@@ -56,24 +56,20 @@ fn create_scoreboard_attachments(dengs: &[Deng],
 
     ordered_scores.into_iter()
         .map(|(user_id, score)| {
-            let user = &user_list
-                .iter()
+            let user = &user_list.iter()
                 .find(|user| match user.id {
                     Some(ref id) => id == user_id,
                     None => false,
                 })
                 .ok_or(Error::from("Could not find matching user"))?;
 
-            let profile = user.profile
-                .as_ref()
+            let profile = user.profile.as_ref()
                 .ok_or(Error::from("Could not find user profile"))?;
 
-            let username = profile.display_name
-                .as_ref()
+            let username = profile.display_name.as_ref()
                 .ok_or(Error::from("Could not find username"))?;
 
-            let full_name = profile.real_name
-                .as_ref()
+            let full_name = profile.real_name.as_ref()
                 .ok_or(Error::from("Could not find username"))?;
 
             let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));

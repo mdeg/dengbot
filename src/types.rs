@@ -46,7 +46,7 @@ impl StdError for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.cause {
-            Some(cause) => write!(f, "{}\n{}", self.description, cause),
+            Some(ref cause) => write!(f, "{}\n{}", self.description, cause),
             None => write!(f, "{}", self.description)
         }
     }

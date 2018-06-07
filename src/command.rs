@@ -1,13 +1,17 @@
-extern crate serde_json;
+extern crate url;
 
 use futures::future::Future;
 use futures;
 use futures::Stream;
+use serde_json;
 use storage;
 use hyper;
-use hyper::{Response, Request, server::Service};
+use std::collections::HashMap;
+use hyper::{Response, Request, server::Service, StatusCode};
 use slackinfo::SlackInfo;
-use types::DbConnection;
+use types::{DbConnection, Error};
+
+const SLACK_TOKEN_PARAM_NAME: &'static str = "token";
 
 pub struct CommandListener {
     info: SlackInfo,
@@ -22,22 +26,11 @@ impl CommandListener {
         }
     }
 
-    pub fn send_scoreboard(&self) {
-        info!("Sending scoreboard printout");
-
-        match storage::load(&self.db_conn) {
-            Ok(dengs) => {
-                if let Err(e) = ::send::build_scoreboard_message(&self.info, &dengs) {
-                    error!("Could not send scoreboard: {}", e);
-                }
-            },
-            Err(e) => error!("Could not load dengs from database: {}", e)
-        }
+    fn build_payload(&self) -> Result<String, Error> {
+        let dengs = storage::load(&self.db_conn).map_err(|e| Error::from(e))?;
+        let payload = ::send::build_scoreboard_message(&self.info, &dengs)?;
+        serde_json::to_string(&payload).map_err(|e| Error::from(e))
     }
-//
-//    fn build_slash_command_failure_response(&self) -> hyper::Response {
-//
-//    }
 }
 
 impl Service for CommandListener {
@@ -47,24 +40,43 @@ impl Service for CommandListener {
     type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        let dengs = storage::load(&self.db_conn).unwrap();
-        let payload = ::send::build_scoreboard_message(&self.info, &dengs).unwrap();
+        // TODO: build payload AFTER verifying token
+        let payload = self.build_payload().unwrap();
 
-        Box::new(req.body().concat2().and_then(move |body| {
+        Box::new(req.body().concat2().and_then(move |body_chunk| {
+            match String::from_utf8(body_chunk.to_vec()) {
+                Ok(body) => {
+                    debug!("Received Slack command body: {}", body);
 
-            let bod = String::from_utf8(body.to_vec()).unwrap();
-            debug!("Received Slack command body: {}", bod);
+                    let params = url::form_urlencoded::parse(body.as_ref())
+                        .into_owned()
+                        .collect::<HashMap<String, String>>();
 
-            let serialized = serde_json::to_string(&payload).unwrap();
+                    match params.get(SLACK_TOKEN_PARAM_NAME) {
+                        Some(val) => {
+                            info!("Received command from Slack. Verifying command token...");
 
-            debug!("Command response payload: {:?}", serialized);
+                            if val == dotenv!("SLACK_COMMAND_VERIFICATION_KEY") {
+                                info!("Successfully verified command token. Sending response.");
 
-            let response = hyper::Response::new()
-                .with_status(hyper::StatusCode::Ok)
-                .with_header(hyper::header::ContentType::json())
-                .with_body(serialized);
+                                return futures::future::ok(
+                                    hyper::Response::new()
+                                        .with_status(StatusCode::Ok)
+                                        .with_header(hyper::header::ContentType::json())
+                                        .with_body(payload))
+                            } else {
+                                error!("Could not validate command token!");
+                            }
+                        },
+                        None => error!("Could not find token parameter in Slack POST.")
+                    }
+                },
+                Err(e) => error!("Could not create string from request body: {}", e)
+            }
 
-            futures::future::ok(response)
+            // fall back to server error response
+            futures::future::ok(hyper::Response::new()
+                .with_status(StatusCode::InternalServerError))
         }))
     }
 }
