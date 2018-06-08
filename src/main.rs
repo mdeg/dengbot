@@ -21,7 +21,6 @@ mod types;
 mod slackinfo;
 mod daycycle;
 mod runner;
-mod send;
 mod command;
 
 use runner::*;

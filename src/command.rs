@@ -1,15 +1,15 @@
 extern crate url;
 
-use futures::future::Future;
-use futures;
-use futures::Stream;
+use futures::{self, Stream, future::Future};
 use serde_json;
 use storage;
 use hyper;
 use std::collections::HashMap;
 use hyper::{Response, Request, server::Service, StatusCode};
 use slackinfo::SlackInfo;
-use types::{DbConnection, Error};
+use types::{DbConnection, Deng, Error};
+use slack;
+use slack_hook::{self, Attachment, AttachmentBuilder, PayloadBuilder};
 
 const SLACK_TOKEN_PARAM_NAME: &'static str = "token";
 
@@ -28,8 +28,90 @@ impl CommandListener {
 
     fn build_scoreboard_message(&self) -> Result<String, Error> {
         let dengs = storage::load(&self.db_conn).map_err(|e| Error::from(e))?;
-        let message = ::send::build_scoreboard_message(&self.info, &dengs)?;
+        let message = Self::build_scoreboard_payload(&self.info, &dengs)?;
         serde_json::to_string(&message).map_err(|e| Error::from(e))
+    }
+
+    fn build_scoreboard_payload(info: &SlackInfo, dengs: &[Deng]) -> Result<CommandResponse, Error> {
+        match dengs.len() {
+            0 => {
+                info!("No scoreboard info found - returning default.");
+
+                PayloadBuilder::new()
+                    .text("No scores yet!")
+                    .build()
+                    .map(|payload| payload.into())
+                    .map_err(|e| Error::from(e))
+            },
+            _ => {
+                let attachments = Self::create_scoreboard_attachments(dengs, &info.users)
+                    .into_iter()
+                    .filter_map(|attachment| match attachment {
+                        Ok(attach) => Some(attach),
+                        Err(e) => {
+                            error!("Could not build attachment: {}", e);
+                            None
+                        }
+                    })
+                    .collect();
+
+                PayloadBuilder::new()
+                    .text(":jewdave: *Deng Champions* :jewdave:")
+                    .attachments(attachments)
+                    .build()
+                    .map(|payload| payload.into())
+                    .map_err(|e| Error::from(e))
+            }
+        }
+    }
+
+    fn create_scoreboard_attachments(dengs: &[Deng],
+                                     user_list: &[slack::User]) -> Vec<Result<Attachment, Error>> {
+        let mut ordered_scores = dengs
+            .iter()
+            .filter(|deng| deng.successful)
+            .fold(HashMap::new(), |mut map, deng| {
+                *map.entry(&deng.user_id).or_insert(0) += deng.value();
+                map
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        ordered_scores.sort_by(|first, second| second.1.cmp(&first.1));
+
+        trace!("Raw ordered score list: {:?}", ordered_scores);
+
+        ordered_scores.into_iter()
+            .map(|(user_id, score)| {
+                let user = &user_list.iter()
+                    .find(|user| match user.id {
+                        Some(ref id) => id == user_id,
+                        None => false,
+                    })
+                    .ok_or(Error::from("Could not find matching user"))?;
+
+                let profile = user.profile.as_ref()
+                    .ok_or(Error::from("Could not find user profile"))?;
+
+                let username = profile.display_name.as_ref()
+                    .ok_or(Error::from("Could not find username"))?;
+
+                let full_name = profile.real_name.as_ref()
+                    .ok_or(Error::from("Could not find username"))?;
+
+                let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
+
+                let formatted_msg = match username.len() {
+                    0 => format!("*{}*\t\t\t*{}*", score, full_name),
+                    _ => format!("*{}*\t\t\t*{}* ({})", score, username, full_name)
+                };
+
+                AttachmentBuilder::new(formatted_msg)
+                    .color(hex_color.as_str())
+                    .build()
+                    .map_err(|e| Error::from(e))
+            })
+            .collect()
     }
 }
 
@@ -78,5 +160,30 @@ impl Service for CommandListener {
             futures::future::ok(hyper::Response::new()
                 .with_status(StatusCode::InternalServerError))
         }))
+    }
+}
+
+#[derive(Serialize)]
+enum ResponseType {
+    #[serde(rename = "ephemeral")]
+    #[allow(dead_code)]
+    Ephemeral,
+    #[serde(rename = "in_channel")]
+    InChannel
+}
+
+#[derive(Serialize)]
+pub struct CommandResponse {
+    response_type: ResponseType,
+    #[serde(flatten)]
+    payload: slack_hook::Payload
+}
+
+impl Into<CommandResponse> for slack_hook::Payload {
+    fn into(self) -> CommandResponse {
+        CommandResponse {
+            response_type: ResponseType::InChannel,
+            payload: self
+        }
     }
 }
