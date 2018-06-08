@@ -26,10 +26,10 @@ impl CommandListener {
         }
     }
 
-    fn build_payload(&self) -> Result<String, Error> {
+    fn build_scoreboard_message(&self) -> Result<String, Error> {
         let dengs = storage::load(&self.db_conn).map_err(|e| Error::from(e))?;
-        let payload = ::send::build_scoreboard_message(&self.info, &dengs)?;
-        serde_json::to_string(&payload).map_err(|e| Error::from(e))
+        let message = ::send::build_scoreboard_message(&self.info, &dengs)?;
+        serde_json::to_string(&message).map_err(|e| Error::from(e))
     }
 }
 
@@ -41,7 +41,7 @@ impl Service for CommandListener {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         // TODO: build payload AFTER verifying token
-        let payload = self.build_payload().unwrap();
+        let msg = self.build_scoreboard_message().unwrap();
 
         Box::new(req.body().concat2().and_then(move |body_chunk| {
             match String::from_utf8(body_chunk.to_vec()) {
@@ -63,7 +63,7 @@ impl Service for CommandListener {
                                     hyper::Response::new()
                                         .with_status(StatusCode::Ok)
                                         .with_header(hyper::header::ContentType::json())
-                                        .with_body(payload))
+                                        .with_body(msg))
                             } else {
                                 error!("Could not validate command token!");
                             }

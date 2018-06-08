@@ -5,9 +5,33 @@ use slack;
 use slack_hook;
 use slack_hook::{Attachment, AttachmentBuilder, PayloadBuilder};
 
-pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
-                                dengs: &[Deng]) -> Result<slack_hook::Payload, Error> {
+#[derive(Serialize)]
+enum ResponseType {
+    #[serde(rename = "ephemeral")]
+    #[allow(dead_code)]
+    Ephemeral,
+    #[serde(rename = "in_channel")]
+    InChannel
+}
 
+#[derive(Serialize)]
+pub struct CommandResponse {
+    response_type: ResponseType,
+    #[serde(flatten)]
+    payload: slack_hook::Payload
+}
+
+impl Into<CommandResponse> for slack_hook::Payload {
+    fn into(self) -> CommandResponse {
+        CommandResponse {
+            response_type: ResponseType::InChannel,
+            payload: self
+        }
+    }
+}
+
+pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
+                                dengs: &[Deng]) -> Result<CommandResponse, Error> {
     match dengs.len() {
         0 => {
             info!("No scoreboard info found - returning default.");
@@ -15,6 +39,7 @@ pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
             PayloadBuilder::new()
                 .text("No scores yet!")
                 .build()
+                .map(|payload| payload.into())
                 .map_err(|e| Error::from(e))
         },
         _ => {
@@ -33,6 +58,7 @@ pub fn build_scoreboard_message(info: &slackinfo::SlackInfo,
                 .text(":jewdave: *Deng Champions* :jewdave:")
                 .attachments(attachments)
                 .build()
+                .map(|payload| payload.into())
                 .map_err(|e| Error::from(e))
         }
     }
