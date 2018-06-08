@@ -1,9 +1,8 @@
 extern crate regex;
 
-use slackinfo::SlackInfo;
 use slack;
 use slack::*;
-use types::Broadcast;
+use types::{Broadcast, SlackInfo};
 use std::sync::mpsc::Sender;
 
 pub struct DengHandler {

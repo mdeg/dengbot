@@ -18,7 +18,6 @@ extern crate serde_json;
 mod denghandler;
 mod storage;
 mod types;
-mod slackinfo;
 mod runner;
 mod command;
 

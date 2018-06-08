@@ -4,7 +4,6 @@ use storage;
 use diesel::pg::PgConnection;
 use types::*;
 use denghandler::DengHandler;
-use slackinfo::SlackInfo;
 use slack;
 use hyper;
 use command;

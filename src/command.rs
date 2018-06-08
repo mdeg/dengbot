@@ -3,11 +3,9 @@ extern crate url;
 use futures::{self, Stream, future::Future};
 use serde_json;
 use storage;
-use hyper;
 use std::collections::HashMap;
-use hyper::{Response, Request, server::Service, StatusCode};
-use slackinfo::SlackInfo;
-use types::{DbConnection, Deng, Error};
+use hyper::{self, Response, Request, server::Service, StatusCode};
+use types::{DbConnection, Deng, Error, SlackInfo};
 use slack;
 use slack_hook::{self, Attachment, AttachmentBuilder, PayloadBuilder};
 
