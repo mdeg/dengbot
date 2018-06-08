@@ -19,7 +19,6 @@ mod denghandler;
 mod storage;
 mod types;
 mod slackinfo;
-mod daycycle;
 mod runner;
 mod command;
 
