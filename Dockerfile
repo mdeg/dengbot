@@ -1,4 +1,4 @@
-FROM rust:1.26.0
+FROM rust:1.26.2
 WORKDIR /main
 COPY . .
 
