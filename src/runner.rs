@@ -51,15 +51,20 @@ impl Runner {
         thread::spawn(move || {
             let server = hyper::server::Http::new()
                 .bind(&addr, move || {
-                    // TODO: this should not unwrap
-                    let db_conn = pool.get().unwrap();
-                    Ok(command::CommandListener::new(info.clone(), db_conn))
-                })
-                .expect("Could not create command listener server");
+                    match pool.get() {
+                        Ok(db_conn) => Ok(command::CommandListener::new(info.clone(), db_conn)),
+                        Err(e) => Err(::std::io::Error::new(::std::io::ErrorKind::TimedOut, e))
+                    }
+                });
 
-            match server.run() {
-                Ok(()) => info!("Command server ended gracefully"),
-                Err(e) => error!("Command server died: {}", e)
+            match server {
+                Ok(serv) => {
+                    match serv.run() {
+                        Ok(()) => info!("Command server ended gracefully"),
+                        Err(e) => error!("Command server died: {}", e)
+                    }
+                },
+                Err(e) => error!("Could not create server: {}", e)
             }
         });
     }
