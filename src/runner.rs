@@ -159,6 +159,8 @@ impl DayCycle {
         while self.has_ended() {
             self.day = Self::generate_day(self.day.end);
         }
+
+        info!("Starting new day @ {:?}", self.day);
     }
 
     pub fn has_ended(&self) -> bool {
