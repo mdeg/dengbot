@@ -49,22 +49,29 @@ impl Runner {
         let info = info_rx.recv().expect("Client died without sending us Slack info!");
 
         thread::spawn(move || {
-            let server = hyper::server::Http::new()
-                .bind(&addr, move || {
-                    match pool.get() {
-                        Ok(db_conn) => Ok(command::CommandListener::new(info.clone(), db_conn)),
-                        Err(e) => Err(::std::io::Error::new(::std::io::ErrorKind::TimedOut, e))
-                    }
-                });
+            loop {
+                let (info_in, pool_in) = (info.clone(), pool.clone());
+                let server = hyper::server::Http::new()
+                    .bind(&addr, move || {
+                        match pool_in.get() {
+                            Ok(db_conn) => Ok(command::CommandListener::new(info_in.clone(), db_conn)),
+                            Err(e) => Err(::std::io::Error::new(::std::io::ErrorKind::TimedOut, e))
+                        }
+                    });
 
-            match server {
-                Ok(serv) => {
-                    match serv.run() {
-                        Ok(()) => info!("Command server ended gracefully"),
-                        Err(e) => error!("Command server died: {}", e)
-                    }
-                },
-                Err(e) => error!("Could not create server: {}", e)
+                match server {
+                    Ok(serv) => {
+                        match serv.run() {
+                            Ok(()) => info!("Command server ended gracefully"),
+                            Err(e) => error!("Command server died: {}", e)
+                        }
+                    },
+                    Err(e) => error!("Could not create server: {}", e)
+                }
+
+                // Sleep for 10 seconds before attempting to reconnect
+                warn!("Command server has been lost. Attempting reconnect in 10 seconds...");
+                thread::sleep(Duration::from_secs(10));
             }
         });
     }
@@ -86,7 +93,7 @@ impl Runner {
                 }
 
                 // Sleep for 10 seconds before attempting to reconnect
-                warn!("Connection to Slack has been lost. Attempting reconnect in 10 seconds...");
+                warn!("Connection to Slack has died. Attempting to restablish in 10 seconds...");
                 thread::sleep(Duration::from_secs(10));
             }
         });

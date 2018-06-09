@@ -121,7 +121,14 @@ impl Service for CommandListener {
 
     fn call(&self, req: Self::Request) -> Self::Future {
         // TODO: build payload AFTER verifying token
-        let msg = self.build_scoreboard_message().unwrap();
+        let msg = match self.build_scoreboard_message() {
+            Ok(msg) => msg,
+            Err(e) => {
+                error!("Could not build scoreboard message: {}", e);
+                return Box::new(futures::future::ok(hyper::Response::new()
+                    .with_status(StatusCode::InternalServerError)));
+            }
+        };
 
         Box::new(req.body().concat2().and_then(move |body_chunk| {
             match String::from_utf8(body_chunk.to_vec()) {
