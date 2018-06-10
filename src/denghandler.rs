@@ -46,14 +46,14 @@ impl DengHandler {
     }
 
     pub fn handle_message(&mut self, message: slack::api::MessageStandard) -> Result<(), String> {
-        let text = message.text.ok_or(String::from("No text in message"))?;
-        let user = message.user.ok_or(String::from("No user in message"))?;
+        let text = message.text.ok_or_else(|| String::from("No text in message"))?;
+        let user = message.user.ok_or_else(|| String::from("No user in message"))?;
 
         debug!("Message from {}: {}", user, text);
 
         if let Some(channel_id) = message.channel {
             let listen_channel_id = &self.info.as_ref()
-                .ok_or(String::from("Info has not been initialised yet"))?
+                .ok_or_else(|| String::from("Info has not been initialised yet"))?
                 .listen_channel_id;
 
             if channel_id == *listen_channel_id {
@@ -62,7 +62,7 @@ impl DengHandler {
                     _ => Broadcast::NonDeng(user)
                 };
 
-                self.tx.send(msg).map_err(|e| String::from(format!("{}", e)))?;
+                self.tx.send(msg).map_err(|e| format!("{}", e))?;
             }
         }
 

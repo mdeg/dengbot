@@ -35,11 +35,11 @@ impl Runner {
         let handler = DengHandler::new(tx.clone(), info_tx.clone());
         self.launch_client(handler, String::from(api_key));
 
-        self.launch_command_listener(info_rx, listen_port);
-        self.run(rx);
+        self.launch_command_listener(&info_rx, listen_port);
+        self.run(&rx);
     }
 
-    fn launch_command_listener(&self, info_rx: Receiver<SlackInfo>, listen_port: &str) {
+    fn launch_command_listener(&self, info_rx: &Receiver<SlackInfo>, listen_port: &str) {
         let addr = format!("0.0.0.0:{}", listen_port).parse().expect("Listen port is not valid");
         let pool = self.db_conn_pool.clone();
 
@@ -99,7 +99,7 @@ impl Runner {
         });
     }
 
-    fn run(&mut self, rx: Receiver<Broadcast>) {
+    fn run(&mut self, rx: &Receiver<Broadcast>) {
         loop {
             match rx.recv().expect("Receiver channel broken!") {
                 Broadcast::Deng(user_id) => self.handle_deng(user_id),

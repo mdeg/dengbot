@@ -9,7 +9,7 @@ use types::{DbConnection, Deng, Error, SlackInfo};
 use slack;
 use slack_hook::{self, Attachment, AttachmentBuilder, PayloadBuilder};
 
-const SLACK_TOKEN_PARAM_NAME: &'static str = "token";
+const SLACK_TOKEN_PARAM_NAME: &str = "token";
 
 pub struct CommandListener {
     info: SlackInfo,
@@ -25,9 +25,9 @@ impl CommandListener {
     }
 
     fn build_scoreboard_message(&self) -> Result<String, Error> {
-        let dengs = storage::load(&self.db_conn).map_err(|e| Error::from(e))?;
+        let dengs = storage::load(&self.db_conn).map_err(Error::from)?;
         let message = Self::build_scoreboard_payload(&self.info, &dengs)?;
-        serde_json::to_string(&message).map_err(|e| Error::from(e))
+        serde_json::to_string(&message).map_err(Error::from)
     }
 
     fn build_scoreboard_payload(info: &SlackInfo, dengs: &[Deng]) -> Result<CommandResponse, Error> {
@@ -39,7 +39,7 @@ impl CommandListener {
                     .text("No scores yet!")
                     .build()
                     .map(|payload| payload.into())
-                    .map_err(|e| Error::from(e))
+                    .map_err(Error::from)
             },
             _ => {
                 let attachments = Self::create_scoreboard_attachments(dengs, &info.users)
@@ -58,7 +58,7 @@ impl CommandListener {
                     .attachments(attachments)
                     .build()
                     .map(|payload| payload.into())
-                    .map_err(|e| Error::from(e))
+                    .map_err(Error::from)
             }
         }
     }
@@ -86,16 +86,16 @@ impl CommandListener {
                         Some(ref id) => id == user_id,
                         None => false,
                     })
-                    .ok_or(Error::from("Could not find matching user"))?;
+                    .ok_or_else(|| Error::from("Could not find matching user"))?;
 
                 let profile = user.profile.as_ref()
-                    .ok_or(Error::from("Could not find user profile"))?;
+                    .ok_or_else(|| Error::from("Could not find user profile"))?;
 
                 let username = profile.display_name.as_ref()
-                    .ok_or(Error::from("Could not find username"))?;
+                    .ok_or_else(|| Error::from("Could not find username"))?;
 
                 let full_name = profile.real_name.as_ref()
-                    .ok_or(Error::from("Could not find username"))?;
+                    .ok_or_else(|| Error::from("Could not find username"))?;
 
                 let hex_color = format!("#{}", user.color.as_ref().unwrap_or(&String::from("000000")));
 
@@ -107,7 +107,7 @@ impl CommandListener {
                 AttachmentBuilder::new(formatted_msg)
                     .color(hex_color.as_str())
                     .build()
-                    .map_err(|e| Error::from(e))
+                    .map_err(Error::from)
             })
             .collect()
     }
