@@ -9,11 +9,10 @@ use hyper;
 use command;
 use r2d2_diesel::ConnectionManager;
 use r2d2::Pool as ConnectionPool;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::ops::Range;
+use std::time::Duration;
 use rand::{Rng, thread_rng};
 use std::fmt::{self, Debug, Formatter};
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::{self, FixedOffset, DateTime, Datelike, Timelike};
 
 pub struct Runner {
     day_cycle: DayCycle,
@@ -140,14 +139,21 @@ impl Runner {
 }
 
 pub struct DayCycle {
-    day: Range<Duration>,
+    start: DateTime<FixedOffset>,
+    end: DateTime<FixedOffset>,
     denged_today: Vec<String>,
 }
 
 impl DayCycle {
     pub fn new() -> Self {
+        let start = Self::generate_day();
+        let end = Self::calculate_end(start);
+
+        info!("Starting new day @ {:?} and ending @ {:?}", start, end);
+
         DayCycle {
-            day: Self::generate_day(Self::now()),
+            start,
+            end,
             denged_today: vec![],
         }
     }
@@ -155,33 +161,41 @@ impl DayCycle {
     pub fn new_day(&mut self) {
         self.denged_today.clear();
 
-        // Start a new day, but ensure the end is in the future
-        while self.has_ended() {
-            self.day = Self::generate_day(self.day.end);
-        }
+        self.start = Self::generate_day();
+        self.end = Self::calculate_end(self.start);
 
-        info!("Starting new day @ {:?}", self.day);
+        info!("Starting new day @ {:?} and ending @ {:?}", self.start, self.end);
     }
 
     pub fn has_ended(&self) -> bool {
-        self.day.end < Self::now()
+        self.end < Self::now()
     }
 
-    fn generate_day(start: Duration) -> Range<Duration> {
-        // In 24 hours time, with up to an hour variance either way
+    // End in one days' time
+    // Add in up to 15 minutes' fuzz to prevent gaming the system
+    fn calculate_end(start: DateTime<FixedOffset>) -> DateTime<FixedOffset> {
         let mut rng = thread_rng();
-        let hours = 24.0 + rng.gen_range(-1.0, 1.0);
-
-        Range {
-            start,
-            end: start + Duration::from_secs(hours as u64 * 60 * 60),
-        }
+        let hours = 24.0 + rng.gen_range(0.0, 0.25);
+        let seconds = hours * 60.0 * 60.0;
+        start + chrono::Duration::seconds(seconds as i64)
     }
 
-    fn now() -> Duration {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time has gone backwards")
+    fn generate_day() -> DateTime<FixedOffset> {
+        let mut time = Self::now();
+        // Rewind to start the day yesterday if we are currently in the morning
+        if time.hour() < 9 {
+            time = time.with_day(time.day() - 1).unwrap();
+        }
+        // Set to 9am
+        time.with_hour(9).unwrap()
+            .with_minute(0).unwrap()
+            .with_second(0).unwrap()
+    }
+
+    // Returns Perth time (GMT+8)
+    fn now() -> DateTime<FixedOffset> {
+        let offset = FixedOffset::east(8 * 3600);
+        chrono::Utc::now().with_timezone(&offset)
     }
 
     pub fn has_denged_today(&self, user_id: &str) -> bool {
@@ -199,12 +213,6 @@ impl DayCycle {
 
 impl Debug for DayCycle {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let start_dt = NaiveDateTime::from_timestamp(self.day.start.as_secs() as i64, 0);
-        let local_start_dt: DateTime<Utc> = DateTime::from_utc(start_dt, Utc);
-
-        let end_dt = NaiveDateTime::from_timestamp(self.day.end.as_secs() as i64, 0);
-        let local_end_dt: DateTime<Utc> = DateTime::from_utc(end_dt, Utc);
-
-        write!(f, "day starts @ {}. Day ends @ {}", local_start_dt.to_rfc2822(), local_end_dt.to_rfc2822())
+        write!(f, "day starts @ {}. Day ends @ {}", self.start.to_rfc2822(), self.end.to_rfc2822())
     }
 }

@@ -4,10 +4,10 @@ version = "1.0.0"
 authors = ["Michael Degano <michael@dega.no>"]
 
 [dependencies]
-slack = "0.20.0"
+slack = "0.21.0"
 log = "0.4.2"
 regex = "1.0.0"
-chrono = "0.4.2"
+chrono = "0.4.4"
 rand = "0.5.1"
 serde = "1.0.60"
 serde_derive = "1.0.60"
